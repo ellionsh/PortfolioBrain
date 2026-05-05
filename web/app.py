@@ -3,6 +3,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import pandas as pd
 import pymysql
+import config
 
 from agent.agent import agent_chat
 from core.asset_operator import AssetOperator
@@ -16,6 +17,23 @@ CORS(app)  # 允许前端/移动端跨域访问
 conn = get_conn()
 op = AssetOperator(conn)
 cf_engine = CashflowEngine(conn)
+
+@app.route("/")
+def index():
+    return {
+        "status": "ok",
+        "message": "PortfolioBrain API is running",
+        "endpoints": [
+            "/chat",
+            "/summary",
+            "/positions",
+            "/cashflows",
+            "/products",
+            "/nav/<id>",
+            "/operate"
+        ]
+    }
+
 
 
 # ============================
@@ -139,6 +157,10 @@ def generate_cashflows():
 # ============================
 # 启动服务
 # ============================
-if __name__ == "__main__":
-    app.run(port=5000, debug=True)
 
+if __name__ == "__main__":
+    app.run(
+        host=config.API_HOST,
+        port=config.API_PORT,
+        debug=config.DEBUG
+    )

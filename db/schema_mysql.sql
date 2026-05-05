@@ -2,6 +2,13 @@
 -- PortfolioBrain MySQL Schema (12 Tables)
 -- ============================================
 
+CREATE DATABASE IF NOT EXISTS portfolio
+  DEFAULT CHARACTER SET utf8mb4
+  DEFAULT COLLATE utf8mb4_unicode_ci;
+
+USE portfolio;
+
+
 -- 1. accounts（账户表）
 CREATE TABLE accounts (
     id INT AUTO_INCREMENT PRIMARY KEY,

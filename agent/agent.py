@@ -5,11 +5,20 @@ from skills.sql_skill import SQLSkill
 from skills.operation_skill import OperationSkill
 from agent.prompts import AGENT_SYSTEM_PROMPT
 
-# DeepSeek API
-client = OpenAI(
-    api_key="YOUR_DEEPSEEK_API_KEY",
-    base_url="https://api.deepseek.com"
+import config
+from deepseek import DeepSeekClient
+
+client = DeepSeekClient(
+    api_key=config.DEEPSEEK_API_KEY,
+    base_url=config.DEEPSEEK_BASE_URL
 )
+
+
+# DeepSeek API
+#client = OpenAI(
+#    api_key="sk-24e6d75c061c4c9bb3fd30f2a93ebe7c",
+#    base_url="https://api.deepseek.com"
+#)
 
 # 初始化数据库连接
 conn = get_conn()

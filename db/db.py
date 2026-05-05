@@ -1,10 +1,25 @@
-import pymysql
+# db/db.py
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+import config
 
-def get_conn():
-    return pymysql.connect(
-        host="localhost",
-        user="root",
-        password="123456",
-        database="portfolio",
-        charset="utf8mb4"
-    )
+DATABASE_URL = (
+    f"mysql+pymysql://{config.DB_USER}:{config.DB_PASS}"
+    f"@{config.DB_HOST}:{config.DB_PORT}/{config.DB_NAME}?charset=utf8mb4"
+)
+
+engine = create_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,
+    pool_recycle=3600,
+    echo=False
+)
+
+SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+
+def get_engine():
+    return engine
+
+def get_session():
+    return SessionLocal()
+
