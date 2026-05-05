@@ -11,8 +11,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/yourname/PortfolioBrain">GitHub</a> ·
-  <a href="https://yourname.github.io/PortfolioBrain">文档网站</a> ·
+  <a href="https://github.com/ellionsh/PortfolioBrain">GitHub</a> ·
+  <a href="https://ellionsh.github.io/PortfolioBrain">文档网站</a> ·
   <a href="#快速开始">快速开始</a>
 </p>
 
@@ -77,22 +77,21 @@ User
 | 06:20  | 到期提醒     |
 
 ## 快速开始
-
 ```bash
-git clone https://github.com/yourname/PortfolioBrain.git
-cd PortfolioBrain
-pip install -r requirements.txt
-mysql -u root -p < db/schema_mysql.sql
-python web/app.py
-streamlit run dashboard/dashboard.py
+1. 克隆仓库
+    git clone https://github.com/yourname/PortfolioBrain.git
+    cd PortfolioBrain
+2. 安装依赖
+    pip install -r requirements.txt
+3. 初始化数据库
+    mysql -u root -p < db/schema_mysql.sql
+4. 启动 Web API
+    python web/app.py
+5. 启动 Dashboard
+    streamlit run dashboard/dashboard.py
+6. 启动移动端（可选）
+    flutter run
 ```
-
-> 可选：启动 Flutter 移动端
-
-```bash
-flutter run
-```
-
 ## 目录结构
 
 ```text
