@@ -1,0 +1,137 @@
+# PortfolioBrain
+
+> 一个真正属于你的智能个人资产管理大脑。
+
+<p align="center">
+  <img src="site/logo.svg" width="140" alt="PortfolioBrain Logo" />
+</p>
+
+<p align="center">
+  <strong>多账户 · 多资产 · 多币种 · 自动现金流 · AI 智能分析 · Dashboard 可视化 · 移动端 App</strong>
+</p>
+
+<p align="center">
+  <a href="https://github.com/yourname/PortfolioBrain">GitHub</a> ·
+  <a href="https://yourname.github.io/PortfolioBrain">文档网站</a> ·
+  <a href="#快速开始">快速开始</a>
+</p>
+
+## 简介
+
+PortfolioBrain 是面向个人投资者的全栈资产管理系统，提供：
+
+- 多账户：银行、券商、保险等资产类型
+- 多资产：存款、理财、保险、股票、基金等
+- 多币种：CNY / USD / HKD / EUR
+- 自动现金流引擎：利息、付息、赎回、缴费等未来现金流生成
+- DeepSeek Agent：自然语言查询、自动生成 SQL、自动操作资产
+- Dashboard 可视化：资产结构、币种敞口、现金流、期限结构、净值曲线
+- Flutter 移动端：随时查看资产与 AI 对话
+- 自动任务系统：每日净值更新、现金流生成、到期提醒
+- REST API：供前端与移动端使用
+
+这是一个可长期维护、可扩展、可自托管的个人资产管理平台。
+
+## 系统架构
+
+```text
+User
+ ├─ Web Dashboard（Streamlit）
+ ├─ Mobile App（Flutter）
+ ├─ Web API（Flask）
+ └─ DeepSeek Agent
+      ├─ SQL Skill → MySQL（12 张表）
+      └─ Operation Skill → AssetOperator
+```
+
+- 数据层：MySQL + 数据视图
+- 逻辑层：AssetOperator + CashflowEngine
+- AI 层：DeepSeek Chat + Tool Calling
+- UI 层：Dashboard + Flutter App + Web
+
+## 核心功能
+
+### 🏦 多账户 / 多资产 / 多币种
+支持银行存款、理财产品、保险、股票、基金等多种资产类型。
+
+### 💰 自动现金流引擎
+自动生成利息、付息、赎回、缴费等未来现金流。
+
+### 🤖 DeepSeek Agent
+通过自然语言查询资产、现金流、风险和期限结构。
+支持自动生成 SQL、执行分析和解释结果。
+
+### 📊 Dashboard 可视化
+可视化展示资产结构、币种敞口、未来现金流、期限结构和净值曲线。
+
+### 📱 Flutter 移动端
+移动端随时查看资产、现金流、理财产品与 AI 对话。
+
+### 🔄 自动任务系统
+支持定时任务：
+
+| 时间   | 任务         |
+| ------ | ------------ |
+| 06:00  | 更新净值     |
+| 06:10  | 生成现金流   |
+| 06:20  | 到期提醒     |
+
+## 快速开始
+
+```bash
+git clone https://github.com/yourname/PortfolioBrain.git
+cd PortfolioBrain
+pip install -r requirements.txt
+mysql -u root -p < db/schema_mysql.sql
+python web/app.py
+streamlit run dashboard/dashboard.py
+```
+
+> 可选：启动 Flutter 移动端
+
+```bash
+flutter run
+```
+
+## 目录结构
+
+```text
+PortfolioBrain/
+  agent/              # DeepSeek Agent
+  core/               # 资产操作层 + 现金流引擎
+  dashboard/          # Streamlit Dashboard
+  db/                 # MySQL 连接 + schema
+  migrate/            # Excel → MySQL 迁移器
+  tasks/              # 自动任务系统
+  web/                # REST API
+  site/               # 官方网站
+  docs/               # 文档网站（mkdocs）
+  frontend/           # Flutter App
+```
+
+## 文档
+
+完整文档请查看 `docs/`，或访问：
+
+https://yourname.github.io/PortfolioBrain
+
+## 技术栈
+
+- Python
+- MySQL
+- Flask
+- Streamlit
+- Flutter
+- DeepSeek Chat
+- mkdocs-material
+- Docker（可选）
+
+## 许可协议
+
+MIT License
+
+## 致谢
+
+感谢 DeepSeek、Streamlit、Flutter、MySQL 等优秀开源项目。
+
+如果你喜欢这个项目，欢迎点一个 ⭐ 支持一下！

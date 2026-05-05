@@ -1,0 +1,8 @@
+pymysql
+pandas
+flask
+streamlit
+python-dateutil
+pytest
+openai
+schedule
