@@ -1,0 +1,11 @@
+<svg width="180" height="180" viewBox="0 0 180 180" xmlns="http://www.w3.org/2000/svg">
+  <rect x="10" y="10" width="160" height="160" rx="32" fill="#0ea5e9"/>
+  <text x="90" y="110"
+        font-family="Arial, sans-serif"
+        font-size="82"
+        font-weight="800"
+        text-anchor="middle"
+        fill="#0f172a">
+    PB
+  </text>
+</svg>
