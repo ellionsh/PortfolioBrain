@@ -18,9 +18,9 @@ class OperationSkill:
         elif action == "create_account":
             return self.create_account(params)
         elif action == "delete_account":
-            return self.delete_account(params)
+            return self.op.delete_account(params)
         elif action == "update_account":
-            return self.update_account(params)
+            return self.op.update_account(params)
         else:
             return {"error": f"未知操作：{action}"}
 
