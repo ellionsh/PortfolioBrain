@@ -43,7 +43,7 @@ tools = [
         "type": "function",
         "function": {
             "name": "operate",
-            "description": "执行资产操作（买入/卖出/更新净值/更新状态/更新保险现金价值）",
+            "description": "执行资产操作（买入/卖出/更新净值/更新状态/更新保险现金价值/新增账户/删除账户/更新账户）",
             "parameters": {
                 "type": "object",
                 "properties": {
