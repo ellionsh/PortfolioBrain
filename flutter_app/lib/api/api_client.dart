@@ -53,4 +53,14 @@ class ApiClient {
       throw Exception('Insurance API error');
     }
   }
+
+    static Future<Map<String, dynamic>> getSummary() async {
+    final resp = await http.get(Uri.parse('$baseUrl/summary'));
+    if (resp.statusCode == 200) {
+      return jsonDecode(resp.body) as Map<String, dynamic>;
+    } else {
+      throw Exception('Summary API error');
+    }
+  }
+
 }

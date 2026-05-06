@@ -12,7 +12,7 @@
 
 <p align="center">
   <a href="https://github.com/ellionsh/PortfolioBrain">GitHub</a> ·
-  <a href="https://ellionsh.github.io/PortfolioBrain">文档网站</a> ·
+  <a href="https://.github.io/PortfolioBrain">文档网站</a> ·
   <a href="#快速开始">快速开始</a>
 </p>
 

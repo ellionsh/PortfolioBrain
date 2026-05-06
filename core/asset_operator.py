@@ -233,4 +233,63 @@ class AssetOperator:
 
         self.session.commit()
         return {"status": "success"}
+    
+def create_account(self, params):
+    name = params.get("name")
+    institution = params.get("institution")
+    type_ = params.get("type")
+    currency = params.get("currency", "CNY")
+
+    if not name or not institution or not type_:
+        return {"error": "name, institution, type are required"}
+
+    sql = """
+        INSERT INTO accounts (name, institution, type, currency)
+        VALUES (:name, :institution, :type, :currency)
+    """
+    self.session.execute(sql, {
+        "name": name,
+        "institution": institution,
+        "type": type_,
+        "currency": currency
+    })
+    self.session.commit()
+
+    return {"status": "success", "message": f"账户 {name} 已创建"}
+
+
+def delete_account(self, params):
+    account_id = params.get("id")
+    if not account_id:
+        return {"error": "id is required"}
+
+    sql = "DELETE FROM accounts WHERE id=:id"
+    self.session.execute(sql, {"id": account_id})
+    self.session.commit()
+
+    return {"status": "success", "message": f"账户 {account_id} 已删除"}
+
+
+def update_account(self, params):
+    account_id = params.get("id")
+    if not account_id:
+        return {"error": "id is required"}
+
+    fields = []
+    values = {"id": account_id}
+
+    for key in ["name", "institution", "type", "currency"]:
+        if key in params:
+            fields.append(f"{key} = :{key}")
+            values[key] = params[key]
+
+    if not fields:
+        return {"error": "no fields to update"}
+
+    sql = f"UPDATE accounts SET {', '.join(fields)} WHERE id=:id"
+    self.session.execute(sql, values)
+    self.session.commit()
+
+    return {"status": "success", "message": f"账户 {account_id} 已更新"}
+
 
