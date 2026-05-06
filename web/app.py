@@ -1,4 +1,15 @@
 # web/app.py
+
+import datetime
+def serialize(obj):
+    if isinstance(obj, (datetime.date, datetime.datetime)):
+        return obj.isoformat()
+    if isinstance(obj, dict):
+        return {k: serialize(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [serialize(v) for v in obj]
+    return obj
+
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import pandas as pd
@@ -36,6 +47,73 @@ def index():
             "/operate"
         ]
     }
+
+# ============================
+# 1. Flutter API 接口（返回 JSON 数据）
+# ============================
+
+@app.route("/accounts", methods=["GET"])
+def get_accounts():
+    df = pd.read_sql("SELECT * FROM accounts ORDER BY id", engine)
+    data = df.to_dict(orient="records")
+    return jsonify(serialize(data))
+
+@app.route("/bank_deposits", methods=["GET"])
+def get_bank_deposits():
+    df = pd.read_sql("""
+        SELECT id, account_id, deposit_type, principal, interest_rate,
+               start_date, end_date, status
+        FROM bank_deposits
+        ORDER BY id DESC
+    """, engine)
+    data = df.to_dict(orient="records")
+    return jsonify(serialize(data))
+
+@app.route("/cashflows", methods=["GET"])
+def get_cashflows_api():
+    df = pd.read_sql("""
+        SELECT id, source_type, source_id, account_id,
+               date, amount, currency, direction, description
+        FROM cashflows
+        ORDER BY date DESC
+    """, engine)
+    data = df.to_dict(orient="records")
+    return jsonify(serialize(data))
+
+@app.route("/insurance_products", methods=["GET"])
+def get_insurance_products():
+    df = pd.read_sql("""
+        SELECT id, account_id, product_name, company, type,
+               premium, premium_freq, premium_years,
+               coverage_amount, start_date, status
+        FROM insurance_products
+        ORDER BY id DESC
+    """, engine)
+    data = df.to_dict(orient="records")
+    return jsonify(serialize(data))
+
+@app.route("/financial_products", methods=["GET"])
+def get_financial_products():
+    df = pd.read_sql("""
+        SELECT id, account_id, product_name, product_code, type,
+               currency, principal, expected_yield,
+               start_date, end_date, status
+        FROM financial_products
+        ORDER BY id DESC
+    """, engine)
+    data = df.to_dict(orient="records")
+    return jsonify(serialize(data))
+
+@app.route("/financial_transactions", methods=["GET"])
+def get_financial_transactions():
+    df = pd.read_sql("""
+        SELECT id, product_id, account_id, trade_date,
+               trade_type, shares, amount, nav
+        FROM financial_transactions
+        ORDER BY trade_date DESC
+    """, engine)
+    data = df.to_dict(orient="records")
+    return jsonify(serialize(data))
 
 
 # ============================
