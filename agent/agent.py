@@ -8,6 +8,18 @@ from skills.operation_skill import OperationSkill
 from agent.prompts import AGENT_SYSTEM_PROMPT
 import config
 
+import datetime
+
+def serialize(obj):
+    if isinstance(obj, (datetime.date, datetime.datetime)):
+        return obj.isoformat()
+    if isinstance(obj, dict):
+        return {k: serialize(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [serialize(v) for v in obj]
+    return obj
+
+
 # 使用 OpenAI SDK 调用 DeepSeek API（官方推荐方式）
 client = OpenAI(
     api_key=config.DEEPSEEK_API_KEY,
@@ -92,6 +104,7 @@ def agent_chat(user_query: str) -> str:
                 name = call.function.name
                 args = json.loads(call.function.arguments)
                 result = call_tool(name, args)
+                result = serialize(result)
 
                 # 工具返回消息
                 messages.append({
