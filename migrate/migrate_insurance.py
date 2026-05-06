@@ -2,32 +2,38 @@
 import pandas as pd
 from migrate.mapping import normalize_columns
 
-def migrate_insurance(conn, path):
+def migrate_insurance(engine, path):
     df = pd.read_excel(path)
     df = normalize_columns(df)
 
-    cur = conn.cursor()
+    # 默认值处理
+    df["currency"] = df.get("currency", "CNY")
+    df["status"] = "active"
 
-    for _, row in df.iterrows():
-        cur.execute("""
-            INSERT INTO insurance_products (
-                account_id, product_name, company, type,
-                currency, premium, premium_freq, premium_years,
-                coverage_amount, start_date, end_date, status
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'active')
-        """, (
-            row.get("account_id"),
-            row.get("product_name"),
-            row.get("company"),
-            row.get("type"),
-            row.get("currency", "CNY"),
-            row.get("premium"),
-            row.get("premium_freq"),
-            row.get("premium_years"),
-            row.get("coverage_amount"),
-            row.get("start_date"),
-            row.get("end_date"),
-        ))
+    # 只保留数据库需要的字段
+    required_cols = [
+        "account_id",
+        "product_name",
+        "company",
+        "type",
+        "currency",
+        "premium",
+        "premium_freq",
+        "premium_years",
+        "coverage_amount",
+        "start_date",
+        "end_date",
+        "status"
+    ]
+    df = df[required_cols]
 
-    conn.commit()
+    # 批量写入 MySQL（SQLAlchemy + pandas）
+    df.to_sql(
+        "insurance_products",
+        engine,
+        if_exists="append",
+        index=False
+    )
+
     return {"status": "success", "rows": len(df)}
+

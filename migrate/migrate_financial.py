@@ -2,57 +2,74 @@
 import pandas as pd
 from migrate.mapping import normalize_columns
 
-def migrate_financial_products(conn, path):
+# ============================================
+# 迁移 financial_products
+# ============================================
+def migrate_financial_products(engine, path):
     df = pd.read_excel(path)
     df = normalize_columns(df)
 
-    cur = conn.cursor()
+    # 默认值处理
+    df["type"] = df.get("type", "nav")
+    df["currency"] = df.get("currency", "CNY")
+    df["is_nav_based"] = df["type"].apply(lambda x: 1 if x == "nav" else 0)
+    df["status"] = "active"
 
-    for _, row in df.iterrows():
-        cur.execute("""
-            INSERT INTO financial_products (
-                account_id, product_name, product_code, type,
-                currency, is_nav_based, principal, expected_yield,
-                start_date, end_date, status
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'active')
-        """, (
-            row.get("account_id"),
-            row.get("product_name"),
-            row.get("product_code"),
-            row.get("type", "nav"),
-            row.get("currency", "CNY"),
-            1 if row.get("type") == "nav" else 0,
-            row.get("principal"),
-            row.get("expected_yield"),
-            row.get("start_date"),
-            row.get("end_date"),
-        ))
+    # 只保留数据库需要的字段
+    required_cols = [
+        "account_id",
+        "product_name",
+        "product_code",
+        "type",
+        "currency",
+        "is_nav_based",
+        "principal",
+        "expected_yield",
+        "start_date",
+        "end_date",
+        "status"
+    ]
+    df = df[required_cols]
 
-    conn.commit()
+    # 批量写入 MySQL
+    df.to_sql(
+        "financial_products",
+        engine,
+        if_exists="append",
+        index=False
+    )
+
     return {"status": "success", "rows": len(df)}
 
 
-def migrate_financial_transactions(conn, path):
+# ============================================
+# 迁移 financial_transactions
+# ============================================
+def migrate_financial_transactions(engine, path):
     df = pd.read_excel(path)
     df = normalize_columns(df)
 
-    cur = conn.cursor()
+    # 默认值处理
+    df["currency"] = df.get("currency", "CNY")
 
-    for _, row in df.iterrows():
-        cur.execute("""
-            INSERT INTO financial_transactions (
-                product_id, account_id, trade_date, trade_type,
-                shares, amount, nav, currency
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, 'CNY')
-        """, (
-            row.get("product_id"),
-            row.get("account_id"),
-            row.get("trade_date"),
-            row.get("trade_type"),
-            row.get("shares"),
-            row.get("amount"),
-            row.get("nav"),
-        ))
+    required_cols = [
+        "product_id",
+        "account_id",
+        "trade_date",
+        "trade_type",
+        "shares",
+        "amount",
+        "nav",
+        "currency"
+    ]
+    df = df[required_cols]
 
-    conn.commit()
+    df.to_sql(
+        "financial_transactions",
+        engine,
+        if_exists="append",
+        index=False
+    )
+
     return {"status": "success", "rows": len(df)}
+

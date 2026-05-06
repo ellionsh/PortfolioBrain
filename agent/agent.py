@@ -1,29 +1,27 @@
+# agent/agent.py
 import json
 from openai import OpenAI
-from db.db import get_conn
+
+from db.db import get_engine, get_session
 from skills.sql_skill import SQLSkill
 from skills.operation_skill import OperationSkill
 from agent.prompts import AGENT_SYSTEM_PROMPT
-
 import config
-from deepseek import DeepSeekClient
 
-client = DeepSeekClient(
+# 使用 OpenAI SDK 调用 DeepSeek API（官方推荐方式）
+client = OpenAI(
     api_key=config.DEEPSEEK_API_KEY,
     base_url=config.DEEPSEEK_BASE_URL
 )
 
+# 全局 SQLAlchemy engine + session
+engine = get_engine()
+session = get_session()
 
-# DeepSeek API
-#client = OpenAI(
-#    api_key="sk-24e6d75c061c4c9bb3fd30f2a93ebe7c",
-#    base_url="https://api.deepseek.com"
-#)
+# 初始化技能
+sql_skill = SQLSkill()              # 自动使用 engine
+op_skill = OperationSkill(session)  # 使用 SQLAlchemy session
 
-# 初始化数据库连接
-conn = get_conn()
-sql_skill = SQLSkill(conn)
-op_skill = OperationSkill(conn)
 
 # 工具定义
 tools = [
@@ -58,13 +56,13 @@ tools = [
     }
 ]
 
+
 def call_tool(name, args):
     if name == "run_sql":
         return sql_skill.run_sql(args["query"])
     if name == "operate":
         return op_skill.operate(args["action"], args["params"])
     return {"error": "unknown tool"}
-
 def agent_chat(user_query: str) -> str:
     messages = [
         {"role": "system", "content": AGENT_SYSTEM_PROMPT},
@@ -82,17 +80,31 @@ def agent_chat(user_query: str) -> str:
 
         # 工具调用
         if msg.tool_calls:
+            # 先把 assistant 的 tool_calls 消息加入 messages
+            messages.append({
+                "role": "assistant",
+                "content": None,
+                "tool_calls": msg.tool_calls
+            })
+
+            # 执行每个工具
             for call in msg.tool_calls:
                 name = call.function.name
                 args = json.loads(call.function.arguments)
                 result = call_tool(name, args)
 
+                # 工具返回消息
                 messages.append({
                     "role": "tool",
                     "tool_call_id": call.id,
                     "content": json.dumps(result, ensure_ascii=False),
                 })
+
+            # 继续下一轮
             continue
 
         # 最终回答
         return msg.content
+
+
+

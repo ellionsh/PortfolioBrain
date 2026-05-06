@@ -2,21 +2,24 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import pandas as pd
-import pymysql
 import config
 
 from agent.agent import agent_chat
 from core.asset_operator import AssetOperator
 from core.cashflow_engine import CashflowEngine
-from db.db import get_conn
+from db.db import get_engine, get_session
 
 app = Flask(__name__)
-CORS(app)  # 允许前端/移动端跨域访问
+CORS(app)
 
-# 全局数据库连接
-conn = get_conn()
-op = AssetOperator(conn)
-cf_engine = CashflowEngine(conn)
+# 全局 SQLAlchemy engine + session
+engine = get_engine()
+session = get_session()
+
+# 资产操作器 & 现金流引擎（使用 SQLAlchemy session）
+op = AssetOperator(session)
+cf_engine = CashflowEngine(session)
+
 
 @app.route("/")
 def index():
@@ -35,7 +38,6 @@ def index():
     }
 
 
-
 # ============================
 # 1. Agent 对话接口
 # ============================
@@ -50,12 +52,12 @@ def chat():
 # ============================
 @app.route("/summary", methods=["GET"])
 def summary():
-    df_assets = pd.read_sql("SELECT SUM(market_value) AS v FROM positions", conn)
+    df_assets = pd.read_sql("SELECT SUM(market_value) AS v FROM positions", engine)
     df_cf = pd.read_sql("""
         SELECT SUM(amount) AS v FROM cashflows
         WHERE date >= CURDATE()
         AND date < DATE_ADD(CURDATE(), INTERVAL 180 DAY)
-    """, conn)
+    """, engine)
 
     return {
         "total_assets": float(df_assets["v"][0] or 0),
@@ -73,7 +75,7 @@ def positions():
         FROM positions
         ORDER BY date DESC
         LIMIT 200
-    """, conn)
+    """, engine)
     return df.to_dict(orient="records")
 
 
@@ -87,7 +89,7 @@ def cashflows():
         FROM cashflows
         WHERE date >= CURDATE()
         ORDER BY date
-    """, conn)
+    """, engine)
     return df.to_dict(orient="records")
 
 
@@ -101,7 +103,7 @@ def products():
                principal, expected_yield, start_date, end_date, status
         FROM financial_products
         ORDER BY id DESC
-    """, conn)
+    """, engine)
     return df.to_dict(orient="records")
 
 
@@ -115,7 +117,7 @@ def nav_curve(pid):
         FROM financial_navs
         WHERE product_id=%s
         ORDER BY date
-    """, conn, params=[pid])
+    """, engine, params=[pid])
     return df.to_dict(orient="records")
 
 
@@ -128,7 +130,7 @@ def maturity():
         SELECT product_name, start_date, end_date
         FROM financial_products
         WHERE end_date IS NOT NULL
-    """, conn)
+    """, engine)
     return df.to_dict(orient="records")
 
 
@@ -157,10 +159,10 @@ def generate_cashflows():
 # ============================
 # 启动服务
 # ============================
-
 if __name__ == "__main__":
     app.run(
         host=config.API_HOST,
         port=config.API_PORT,
         debug=config.DEBUG
     )
+

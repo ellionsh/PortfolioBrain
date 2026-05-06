@@ -2,27 +2,35 @@
 import pandas as pd
 from migrate.mapping import normalize_columns
 
-def migrate_bank(conn, path):
+def migrate_bank(engine, path):
     df = pd.read_excel(path)
     df = normalize_columns(df)
 
-    cur = conn.cursor()
+    # 默认值处理
+    df["deposit_type"] = df.get("deposit_type", "fixed")
+    df["currency"] = df.get("currency", "CNY")
+    df["status"] = "active"
 
-    for _, row in df.iterrows():
-        cur.execute("""
-            INSERT INTO bank_deposits (
-                account_id, deposit_type, currency, principal,
-                interest_rate, start_date, end_date, status
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, 'active')
-        """, (
-            row.get("account_id"),
-            row.get("deposit_type", "fixed"),
-            row.get("currency", "CNY"),
-            row.get("principal"),
-            row.get("interest_rate"),
-            row.get("start_date"),
-            row.get("end_date"),
-        ))
+    # 只保留数据库需要的字段
+    required_cols = [
+        "account_id",
+        "deposit_type",
+        "currency",
+        "principal",
+        "interest_rate",
+        "start_date",
+        "end_date",
+        "status"
+    ]
+    df = df[required_cols]
 
-    conn.commit()
+    # 批量写入 MySQL（SQLAlchemy + pandas）
+    df.to_sql(
+        "bank_deposits",
+        engine,
+        if_exists="append",
+        index=False
+    )
+
     return {"status": "success", "rows": len(df)}
+
