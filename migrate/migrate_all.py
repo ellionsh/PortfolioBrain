@@ -7,6 +7,7 @@ from migrate.migrate_financial import (
     migrate_financial_transactions
 )
 from migrate.migrate_insurance import migrate_insurance
+from migrate.migrate_accounts import migrate_accounts
 
 DATA_DIR = "data"
 
@@ -28,9 +29,9 @@ def migrate_all():
 
         elif file.startswith("insurance_"):
             results[file] = migrate_insurance(engine, path)
-
+        elif file.startswith("accounts_"):
+            results[file] = migrate_accounts(engine, path)
     return results
-
 
 if __name__ == "__main__":
     print("开始迁移 Excel 数据...")
