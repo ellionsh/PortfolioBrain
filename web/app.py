@@ -1,6 +1,8 @@
 # web/app.py
 
 import datetime
+
+from skills.operation_skill import OperationSkill
 def serialize(obj):
     if isinstance(obj, (datetime.date, datetime.datetime)):
         return obj.isoformat()
@@ -28,7 +30,8 @@ engine = get_engine()
 session = get_session()
 
 # 资产操作器 & 现金流引擎（使用 SQLAlchemy session）
-op = AssetOperator(session)
+#op = AssetOperator(session)
+op_skill = OperationSkill(session)
 cf_engine = CashflowEngine(session)
 
 
@@ -221,7 +224,7 @@ def operate():
     action = data.get("action")
     params = data.get("params", {})
 
-    result = op.operate(action, params)
+    result = op_skill.operate(action, params)
     return jsonify(result)
 
 
