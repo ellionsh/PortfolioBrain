@@ -10,6 +10,9 @@ class AssetOperator:
     - 更新净值（update_nav）
     - 更新状态（update_status）
     - 更新保险现金价值（update_cash_value）
+    - 新增账户（create_account）
+    - 删除账户（delete_account）
+    - 更新账户（update_account）
     """
 
     def __init__(self, session):
