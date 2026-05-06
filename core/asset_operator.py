@@ -1,4 +1,3 @@
-# core/asset_operator.py
 from sqlalchemy import text
 
 class AssetOperator:
@@ -236,63 +235,50 @@ class AssetOperator:
 
         self.session.commit()
         return {"status": "success"}
-    
-def create_account(self, params):
-    name = params.get("name")
-    institution = params.get("institution")
-    type_ = params.get("type")
-    currency = params.get("currency", "CNY")
 
-    if not name or not institution or not type_:
-        return {"error": "name, institution, type are required"}
+    # ============================
+    # 6. 新增账户
+    # ============================
+    def create_account(self, name, institution, type, currency="CNY"):
+        self.session.execute(text("""
+            INSERT INTO accounts (name, institution, type, currency)
+            VALUES (:name, :institution, :type, :currency)
+        """), {
+            "name": name,
+            "institution": institution,
+            "type": type,
+            "currency": currency
+        })
+        self.session.commit()
+        return {"status": "success", "message": f"账户 {name} 已创建"}
 
-    sql = """
-        INSERT INTO accounts (name, institution, type, currency)
-        VALUES (:name, :institution, :type, :currency)
-    """
-    self.session.execute(sql, {
-        "name": name,
-        "institution": institution,
-        "type": type_,
-        "currency": currency
-    })
-    self.session.commit()
+    # ============================
+    # 7. 删除账户
+    # ============================
+    def delete_account(self, id):
+        self.session.execute(text("""
+            DELETE FROM accounts WHERE id=:id
+        """), {"id": id})
+        self.session.commit()
+        return {"status": "success", "message": f"账户 {id} 已删除"}
 
-    return {"status": "success", "message": f"账户 {name} 已创建"}
+    # ============================
+    # 8. 更新账户
+    # ============================
+    def update_account(self, id, **kwargs):
+        fields = []
+        params = {"id": id}
 
+        for key in ["name", "institution", "type", "currency"]:
+            if key in kwargs:
+                fields.append(f"{key} = :{key}")
+                params[key] = kwargs[key]
 
-def delete_account(self, params):
-    account_id = params.get("id")
-    if not account_id:
-        return {"error": "id is required"}
+        if not fields:
+            return {"error": "没有需要更新的字段"}
 
-    sql = "DELETE FROM accounts WHERE id=:id"
-    self.session.execute(sql, {"id": account_id})
-    self.session.commit()
+        sql = f"UPDATE accounts SET {', '.join(fields)} WHERE id=:id"
+        self.session.execute(text(sql), params)
+        self.session.commit()
 
-    return {"status": "success", "message": f"账户 {account_id} 已删除"}
-
-
-def update_account(self, params):
-    account_id = params.get("id")
-    if not account_id:
-        return {"error": "id is required"}
-
-    fields = []
-    values = {"id": account_id}
-
-    for key in ["name", "institution", "type", "currency"]:
-        if key in params:
-            fields.append(f"{key} = :{key}")
-            values[key] = params[key]
-
-    if not fields:
-        return {"error": "no fields to update"}
-
-    sql = f"UPDATE accounts SET {', '.join(fields)} WHERE id=:id"
-    self.session.execute(sql, values)
-    self.session.commit()
-
-    return {"status": "success", "message": f"账户 {account_id} 已更新"}
-
-
+        return {"status": "success", "message": f"账户 {id} 已更新"}
