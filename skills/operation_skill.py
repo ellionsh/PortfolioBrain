@@ -1,40 +1,82 @@
-from core.asset_operator import AssetOperator
+# skills/operation_skill.py
 
 class OperationSkill:
-    def __init__(self, conn):
-        self.op = AssetOperator(conn)
+    def __init__(self, session):
+        from agent.asset_operator import AssetOperator
+        self.op = AssetOperator(session)
 
     def operate(self, action: str, params: dict):
-        if action == "buy":
-            return self.op.buy(**params)
-        elif action == "sell":
-            return self.op.sell(**params)
-        elif action == "update_nav":
-            return self.op.update_nav(**params)
-        elif action == "update_status":
-            return self.op.update_status(**params)
-        elif action == "update_cash_value":
-            return self.op.update_cash_value(**params)
-        elif action == "create_account":
+        """
+        统一操作入口，根据 action 调用 AssetOperator 的对应方法。
+        所有 action 名称均为强语义，避免 LLM 误判。
+        """
+
+        # ============================
+        # 1. 账户操作（Account）
+        # ============================
+        if action == "account_create":
             return self.op.create_account(**params)
-        elif action == "delete_account":
+
+        elif action == "account_delete":
             return self.op.delete_account(**params)
-        elif action == "update_account":
+
+        elif action == "account_update":
             return self.op.update_account(**params)
-        # ============ 银行存款操作 ============
-        elif action == "add_bank_deposit":
+
+        # ============================
+        # 2. 银行存款（Bank Deposit）
+        # ============================
+        elif action == "bank_deposit_add":
             return self.op.add_bank_deposit(**params)
-        elif action == "withdraw_bank_deposit":
-            return self.op.withdraw_bank_deposit(**params)
-        elif action == "update_bank_deposit":
-            return self.op.update_bank_deposit(**params)
-        elif action == "update_bank_deposit_principal":
+
+        elif action == "bank_deposit_update_principal":
             return self.op.update_bank_deposit_principal(**params)
-        elif action == "get_bank_deposit":
+
+        elif action == "bank_deposit_withdraw":
+            return self.op.withdraw_bank_deposit(**params)
+
+        elif action == "bank_deposit_update":
+            return self.op.update_bank_deposit(**params)
+
+        elif action == "bank_deposit_get":
             return self.op.get_bank_deposit(**params)
-        elif action == "get_account_bank_deposits":
+
+        elif action == "bank_deposit_list":
             return self.op.get_account_bank_deposits(**params)
-        elif action == "delete_bank_deposit":
+
+        elif action == "bank_deposit_delete":
             return self.op.delete_bank_deposit(**params)
+
+        # ============================
+        # 3. 理财产品（Financial）
+        # ============================
+        elif action == "financial_buy_nav":
+            return self.op.buy("nav_financial", **params)
+
+        elif action == "financial_buy_fixed":
+            return self.op.buy("fixed_financial", **params)
+
+        elif action == "financial_sell_nav":
+            return self.op.sell("nav_financial", **params)
+
+        elif action == "financial_sell_fixed":
+            return self.op.sell("fixed_financial", **params)
+
+        elif action == "financial_update_nav":
+            return self.op.update_nav(**params)
+
+        # ============================
+        # 4. 保险（Insurance）
+        # ============================
+        elif action == "insurance_buy":
+            return self.op.buy("insurance", **params)
+
+        elif action == "insurance_update_cash_value":
+            return self.op.update_cash_value(**params)
+
+        # ============================
+        # 未知操作
+        # ============================
         else:
             return {"error": f"未知操作：{action}"}
+
