@@ -93,18 +93,12 @@ def agent_chat(user_query: str) -> str:
 
         # 工具调用
         if msg.tool_calls:
-            # 构建 assistant 消息，优先使用 reasoning_content
+            # 构建 assistant 消息
             assistant_msg = {
                 "role": "assistant",
+                "content": msg.content,
                 "tool_calls": msg.tool_calls
             }
-            
-            # 如果有推理内容（thinking mode），在 content 中传回
-            if hasattr(msg, 'reasoning_content') and msg.reasoning_content:
-                assistant_msg["content"] = msg.reasoning_content
-            else:
-                # 即使没有推理内容，也要设置 content 为 msg.content（可能为空）
-                assistant_msg["content"] = msg.content
             
             # 把 assistant 的消息加入 messages
             messages.append(assistant_msg)
@@ -126,8 +120,5 @@ def agent_chat(user_query: str) -> str:
             # 继续下一轮
             continue
 
-        # 最终回答（无工具调用）
-        # 如果最后还有 reasoning_content，也应该返回
-        if hasattr(msg, 'reasoning_content') and msg.reasoning_content:
-            return f"[推理过程]\n{msg.reasoning_content}\n\n[答案]\n{msg.content}"
+        # 最终回答
         return msg.content
