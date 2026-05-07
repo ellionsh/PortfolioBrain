@@ -19,7 +19,7 @@ DB_NAME = os.getenv("PB_DB_NAME", "portfolio")
 # ============================
 DEEPSEEK_API_KEY = os.getenv("PB_DEEPSEEK_API_KEY", "")
 DEEPSEEK_BASE_URL = os.getenv("PB_DEEPSEEK_BASE_URL", "https://api.deepseek.com")
-DEEPSEEK_MODEL = os.getenv("PB_DEEPSEEK_MODEL", "DeepSeek-V4-Flash")
+DEEPSEEK_MODEL = os.getenv("PB_DEEPSEEK_MODEL", "deepseek-v4-flash")
 
 # ============================
 # Web Server Configuration

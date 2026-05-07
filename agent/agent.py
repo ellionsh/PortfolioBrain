@@ -123,6 +123,7 @@ def agent_chat(user_query: str) -> str:
             model=config.DEEPSEEK_MODEL,
             messages=messages,
             tools=tools,
+            extra_body={"thinking": {"type": "disabled"}}
         )
 
         msg = resp.choices[0].message
