@@ -255,12 +255,26 @@ class AssetOperator:
     # ============================
     # 7. 删除账户
     # ============================
-    def delete_account(self, id):
-        self.session.execute(text("""
-            DELETE FROM accounts WHERE id=:id
-        """), {"id": id})
-        self.session.commit()
-        return {"status": "success", "message": f"账户 {id} 已删除"}
+    def delete_account(self, id=None, name=None):
+        if id is None and name is None:
+            return {"error": "必须提供 id 或 name 中的至少一个"}
+        
+        try:
+            if id is not None:
+                self.session.execute(text("""
+                    DELETE FROM accounts WHERE id=:id
+                """), {"id": id})
+                self.session.commit()
+                return {"status": "success", "message": f"账户 ID={id} 已删除"}
+            else:
+                self.session.execute(text("""
+                    DELETE FROM accounts WHERE name=:name
+                """), {"name": name})
+                self.session.commit()
+                return {"status": "success", "message": f"账户 {name} 已删除"}
+        except Exception as e:
+            self.session.rollback()
+            return {"error": str(e)}
 
     # ============================
     # 8. 更新账户
