@@ -83,7 +83,7 @@ def agent_chat(user_query: str) -> str:
 
     while True:
         resp = client.chat.completions.create(
-            model="deepseek-chat",
+            model=config.DEEPSEEK_MODEL,
             messages=messages,
             tools=tools,
         )
