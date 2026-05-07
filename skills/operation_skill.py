@@ -1,8 +1,8 @@
 # skills/operation_skill.py
-
+from core.asset_operator import AssetOperator
 class OperationSkill:
     def __init__(self, session):
-        from agent.asset_operator import AssetOperator
+
         self.op = AssetOperator(session)
 
     def operate(self, action: str, params: dict):
