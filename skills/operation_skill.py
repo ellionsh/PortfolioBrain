@@ -16,11 +16,11 @@ class OperationSkill:
         elif action == "update_cash_value":
             return self.op.update_cash_value(**params)
         elif action == "create_account":
-            return self.op.create_account(params)
+            return self.op.create_account(**params)
         elif action == "delete_account":
-            return self.op.delete_account(params)
+            return self.op.delete_account(**params)
         elif action == "update_account":
-            return self.op.update_account(params)
+            return self.op.update_account(**params)
         else:
             return {"error": f"未知操作：{action}"}
 
