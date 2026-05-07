@@ -55,7 +55,7 @@ tools = [
         "type": "function",
         "function": {
             "name": "operate",
-            "description": "执行资产操作（买入/卖出/更新净值/更新状态/更新保险现金价值/新增账户/删除账户/更新账户）",
+            "description": "执行资产操作（买入/卖出/更新净值/更新状态/更新保险现金价值/新增账户/删除账户/更新账户/银行存款操作等）",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -75,6 +75,7 @@ def call_tool(name, args):
     if name == "operate":
         return op_skill.operate(args["action"], args["params"])
     return {"error": "unknown tool"}
+
 def agent_chat(user_query: str) -> str:
     messages = [
         {"role": "system", "content": AGENT_SYSTEM_PROMPT},
@@ -92,12 +93,19 @@ def agent_chat(user_query: str) -> str:
 
         # 工具调用
         if msg.tool_calls:
-            # 先把 assistant 的 tool_calls 消息加入 messages
-            messages.append({
+            # 构建 assistant 消息
+            assistant_msg = {
                 "role": "assistant",
                 "content": None,
                 "tool_calls": msg.tool_calls
-            })
+            }
+            
+            # 如果有推理内容（thinking mode），需要包含在 assistant 消息中
+            if hasattr(msg, 'reasoning_content') and msg.reasoning_content:
+                assistant_msg["content"] = msg.reasoning_content
+            
+            # 把 assistant 的消息加入 messages
+            messages.append(assistant_msg)
 
             # 执行每个工具
             for call in msg.tool_calls:
@@ -118,6 +126,3 @@ def agent_chat(user_query: str) -> str:
 
         # 最终回答
         return msg.content
-
-
-
