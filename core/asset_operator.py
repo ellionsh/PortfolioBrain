@@ -12,6 +12,7 @@ class AssetOperator:
     - 新增账户（create_account）
     - 删除账户（delete_account）
     - 更新账户（update_account）
+    - 银行存款操作（bank_deposit 相关）
     """
 
     def __init__(self, session):
@@ -73,23 +74,33 @@ class AssetOperator:
         return {"status": "success"}
 
     # --- 银行存款买入 ---
-    def _buy_bank_deposit(self, account_id, deposit_type, principal, rate, start_date, end_date):
-        self.session.execute(text("""
-            INSERT INTO bank_deposits (
-                account_id, deposit_type, principal, interest_rate,
-                start_date, end_date, status
-            ) VALUES (:aid, :dtype, :p, :r, :sd, :ed, 'active')
-        """), {
-            "aid": account_id,
-            "dtype": deposit_type,
-            "p": principal,
-            "r": rate,
-            "sd": start_date,
-            "ed": end_date
-        })
+    def _buy_bank_deposit(self, account_id, deposit_type, principal, rate, start_date, end_date, currency="CNY", **kwargs):
+        try:
+            self.session.execute(text("""
+                INSERT INTO bank_deposits (
+                    account_id, deposit_type, currency, principal, interest_rate,
+                    start_date, end_date, status, interest_method, notice_days, auto_renew, remark
+                ) VALUES (:aid, :dtype, :currency, :p, :r, :sd, :ed, 'active', 
+                          :interest_method, :notice_days, :auto_renew, :remark)
+            """), {
+                "aid": account_id,
+                "dtype": deposit_type,
+                "currency": currency,
+                "p": principal,
+                "r": rate,
+                "sd": start_date,
+                "ed": end_date,
+                "interest_method": kwargs.get("interest_method", "at_maturity"),
+                "notice_days": kwargs.get("notice_days"),
+                "auto_renew": kwargs.get("auto_renew", False),
+                "remark": kwargs.get("remark")
+            })
 
-        self.session.commit()
-        return {"status": "success"}
+            self.session.commit()
+            return {"status": "success", "message": f"银行存款已创建，本金：{principal}"}
+        except Exception as e:
+            self.session.rollback()
+            return {"error": str(e)}
 
     # --- 保险缴费 ---
     def _buy_insurance(self, product_id, account_id, premium, date):
@@ -170,27 +181,19 @@ class AssetOperator:
         return {"status": "success"}
 
     # --- 银行存款支取 ---
-    def _sell_bank_deposit(self, deposit_id, account_id, amount, date):
-        self.session.execute(text("""
-            UPDATE bank_deposits
-            SET status='redeemed'
-            WHERE id=:id
-        """), {"id": deposit_id})
+    def _sell_bank_deposit(self, deposit_id, amount, date):
+        try:
+            self.session.execute(text("""
+                UPDATE bank_deposits
+                SET status='redeemed'
+                WHERE id=:id
+            """), {"id": deposit_id})
 
-        self.session.execute(text("""
-            INSERT INTO cashflows (
-                source_type, source_id, account_id, date,
-                amount, currency, direction, description
-            ) VALUES ('bank', :did, :aid, :date, :amt, 'CNY', 'inflow', '银行存款支取')
-        """), {
-            "did": deposit_id,
-            "aid": account_id,
-            "date": date,
-            "amt": amount
-        })
-
-        self.session.commit()
-        return {"status": "success"}
+            self.session.commit()
+            return {"status": "success", "message": f"银行存款已提取，金额：{amount}"}
+        except Exception as e:
+            self.session.rollback()
+            return {"error": str(e)}
 
     # ============================
     # 3. 更新净值
@@ -296,3 +299,183 @@ class AssetOperator:
         self.session.commit()
 
         return {"status": "success", "message": f"账户 {id} 已更新"}
+
+    # ============================
+    # 9. 银行存款操作
+    # ============================
+    
+    # --- 9.1 更新银行存款本金（余额） ---
+    def update_bank_deposit_principal(self, deposit_id, new_principal):
+        """更新银行存款的本金（余额）"""
+        try:
+            self.session.execute(text("""
+                UPDATE bank_deposits
+                SET principal=:p
+                WHERE id=:id
+            """), {
+                "p": new_principal,
+                "id": deposit_id
+            })
+            self.session.commit()
+            return {"status": "success", "message": f"银行存款 ID={deposit_id} 本金已更新为 {new_principal}"}
+        except Exception as e:
+            self.session.rollback()
+            return {"error": str(e)}
+
+    # --- 9.2 增加银行存款 ---
+    def add_bank_deposit(self, account_id, deposit_type, principal, interest_rate, 
+                        start_date, end_date, currency="CNY", **kwargs):
+        """增加一笔银行存款"""
+        try:
+            self.session.execute(text("""
+                INSERT INTO bank_deposits (
+                    account_id, deposit_type, currency, principal, interest_rate,
+                    start_date, end_date, status, interest_method, notice_days, auto_renew, remark
+                ) VALUES (:aid, :dtype, :currency, :p, :r, :sd, :ed, 'active',
+                          :interest_method, :notice_days, :auto_renew, :remark)
+            """), {
+                "aid": account_id,
+                "dtype": deposit_type,
+                "currency": currency,
+                "p": principal,
+                "r": interest_rate,
+                "sd": start_date,
+                "ed": end_date,
+                "interest_method": kwargs.get("interest_method", "at_maturity"),
+                "notice_days": kwargs.get("notice_days"),
+                "auto_renew": kwargs.get("auto_renew", False),
+                "remark": kwargs.get("remark")
+            })
+            self.session.commit()
+            return {"status": "success", "message": f"新增银行存款成功，本金：{principal}"}
+        except Exception as e:
+            self.session.rollback()
+            return {"error": str(e)}
+
+    # --- 9.3 提取银行存款 ---
+    def withdraw_bank_deposit(self, deposit_id, withdraw_amount):
+        """提取银行存款（更新本金）"""
+        try:
+            # 先获取当前本金
+            result = self.session.execute(text("""
+                SELECT principal FROM bank_deposits WHERE id=:id
+            """), {"id": deposit_id}).fetchone()
+
+            if not result:
+                return {"error": f"银行存款 ID={deposit_id} 不存在"}
+
+            current_principal = float(result[0])
+            new_principal = current_principal - withdraw_amount
+
+            if new_principal < 0:
+                return {"error": f"提取金额 {withdraw_amount} 超过当前本金 {current_principal}"}
+
+            self.session.execute(text("""
+                UPDATE bank_deposits
+                SET principal=:p
+                WHERE id=:id
+            """), {
+                "p": new_principal,
+                "id": deposit_id
+            })
+            self.session.commit()
+            return {
+                "status": "success",
+                "message": f"提取成功，提取金额：{withdraw_amount}，余额：{new_principal}"
+            }
+        except Exception as e:
+            self.session.rollback()
+            return {"error": str(e)}
+
+    # --- 9.4 更新银行存款信息 ---
+    def update_bank_deposit(self, deposit_id, **kwargs):
+        """更新银行存款的各项信息"""
+        try:
+            fields = []
+            params = {"id": deposit_id}
+
+            # 允许更新的字段
+            allowed_fields = [
+                "deposit_type", "currency", "principal", "interest_rate",
+                "start_date", "end_date", "interest_method", "notice_days",
+                "auto_renew", "status", "remark"
+            ]
+
+            for key in allowed_fields:
+                if key in kwargs:
+                    fields.append(f"{key} = :{key}")
+                    params[key] = kwargs[key]
+
+            if not fields:
+                return {"error": "没有需要更新的字段"}
+
+            sql = f"UPDATE bank_deposits SET {', '.join(fields)} WHERE id=:id"
+            self.session.execute(text(sql), params)
+            self.session.commit()
+
+            return {"status": "success", "message": f"银行存款 ID={deposit_id} 已更新"}
+        except Exception as e:
+            self.session.rollback()
+            return {"error": str(e)}
+
+    # --- 9.5 获取银行存款信息 ---
+    def get_bank_deposit(self, deposit_id):
+        """获取银行存款详情"""
+        try:
+            result = self.session.execute(text("""
+                SELECT id, account_id, deposit_type, currency, principal, interest_rate,
+                       start_date, end_date, interest_method, notice_days, auto_renew, status, remark
+                FROM bank_deposits
+                WHERE id=:id
+            """), {"id": deposit_id}).fetchone()
+
+            if not result:
+                return {"error": f"银行存款 ID={deposit_id} 不存在"}
+
+            columns = [
+                "id", "account_id", "deposit_type", "currency", "principal", 
+                "interest_rate", "start_date", "end_date", "interest_method", 
+                "notice_days", "auto_renew", "status", "remark"
+            ]
+            deposit_info = dict(zip(columns, result))
+            return {"status": "success", "data": deposit_info}
+        except Exception as e:
+            return {"error": str(e)}
+
+    # --- 9.6 获取账户下所有银行存款 ---
+    def get_account_bank_deposits(self, account_id):
+        """获取某个账户下的所有银行存款"""
+        try:
+            results = self.session.execute(text("""
+                SELECT id, account_id, deposit_type, currency, principal, interest_rate,
+                       start_date, end_date, interest_method, notice_days, auto_renew, status, remark
+                FROM bank_deposits
+                WHERE account_id=:aid
+                ORDER BY start_date DESC
+            """), {"aid": account_id}).fetchall()
+
+            if not results:
+                return {"status": "success", "data": [], "message": "该账户没有银行存款"}
+
+            columns = [
+                "id", "account_id", "deposit_type", "currency", "principal",
+                "interest_rate", "start_date", "end_date", "interest_method",
+                "notice_days", "auto_renew", "status", "remark"
+            ]
+            deposits = [dict(zip(columns, row)) for row in results]
+            return {"status": "success", "data": deposits, "count": len(deposits)}
+        except Exception as e:
+            return {"error": str(e)}
+
+    # --- 9.7 删除银行存款 ---
+    def delete_bank_deposit(self, deposit_id):
+        """删除银行存款"""
+        try:
+            self.session.execute(text("""
+                DELETE FROM bank_deposits WHERE id=:id
+            """), {"id": deposit_id})
+            self.session.commit()
+            return {"status": "success", "message": f"银行存款 ID={deposit_id} 已删除"}
+        except Exception as e:
+            self.session.rollback()
+            return {"error": str(e)}
