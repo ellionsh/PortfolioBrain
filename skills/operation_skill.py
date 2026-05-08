@@ -74,6 +74,24 @@ class OperationSkill:
         elif action == "insurance_update_cash_value":
             return self.op.update_cash_value(**params)
 
+        elif action == "insurance_create":
+            return self.op.create_insurance_product(**params)
+
+        elif action == "insurance_update":
+            return self.op.update_insurance_product(**params)
+
+        elif action == "insurance_delete":
+            return self.op.delete_insurance_product(**params)
+
+        elif action == "financial_product_create":
+            return self.op.create_financial_product(**params)
+
+        elif action == "financial_product_update":
+            return self.op.update_financial_product(**params)
+
+        elif action == "financial_product_delete":
+            return self.op.delete_financial_product(**params)
+
         # ============================
         # 未知操作
         # ============================

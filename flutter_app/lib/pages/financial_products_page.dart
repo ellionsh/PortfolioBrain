@@ -1,29 +1,29 @@
 import 'package:flutter/material.dart';
 import '../api/api_client.dart';
 
-class InsurancePage extends StatefulWidget {
-  const InsurancePage({super.key});
+class FinancialProductsPage extends StatefulWidget {
+  const FinancialProductsPage({super.key});
 
   @override
-  State<InsurancePage> createState() => _InsurancePageState();
+  State<FinancialProductsPage> createState() => _FinancialProductsPageState();
 }
 
-class _InsurancePageState extends State<InsurancePage> {
+class _FinancialProductsPageState extends State<FinancialProductsPage> {
   late Future<List<dynamic>> _future;
 
   @override
   void initState() {
     super.initState();
-    _future = ApiClient.getInsurance();
+    _future = ApiClient.getFinancialProducts();
   }
 
   Future<void> _refresh() async {
     setState(() {
-      _future = ApiClient.getInsurance();
+      _future = ApiClient.getFinancialProducts();
     });
   }
 
-  Future<void> _showInsuranceDialog({Map<String, dynamic>? insurance}) async {
+  Future<void> _showProductDialog({Map<String, dynamic>? product}) async {
     final accounts = await ApiClient.getAccounts();
     if (!mounted) return;
     final accountChoices = accounts
@@ -31,27 +31,28 @@ class _InsurancePageState extends State<InsurancePage> {
         .map((m) => MapEntry((m['id'] as num).toInt(), m['name'] as String? ?? ''))
         .toList();
 
-    int? selectedAccountId = insurance != null ? (insurance['account_id'] as num?)?.toInt() : null;
-    final productNameController = TextEditingController(text: insurance?['product_name'] ?? '');
-    final companyController = TextEditingController(text: insurance?['company'] ?? '');
-    final typeController = TextEditingController(text: insurance?['type'] ?? '');
-    final currencyController = TextEditingController(text: insurance?['currency'] ?? 'CNY');
-    final premiumController = TextEditingController(text: insurance?['premium']?.toString() ?? '');
-    final premiumFreqController = TextEditingController(text: insurance?['premium_freq'] ?? 'annual');
-    final premiumYearsController = TextEditingController(text: insurance?['premium_years']?.toString() ?? '');
-    final coverageController = TextEditingController(text: insurance?['coverage_amount']?.toString() ?? '');
-    final startController = TextEditingController(text: insurance?['start_date'] ?? '');
-    final endController = TextEditingController(text: insurance?['end_date'] ?? '');
-    final cashValueController = TextEditingController(text: insurance?['cash_value']?.toString() ?? '');
-    final statusController = TextEditingController(text: insurance?['status'] ?? 'active');
-    final remarkController = TextEditingController(text: insurance?['remark'] ?? '');
+    int? selectedAccountId = product != null ? (product['account_id'] as num?)?.toInt() : null;
+    final nameController = TextEditingController(text: product?['product_name'] ?? '');
+    final codeController = TextEditingController(text: product?['product_code'] ?? '');
+    final typeController = TextEditingController(text: product?['type'] ?? '');
+    final currencyController = TextEditingController(text: product?['currency'] ?? 'CNY');
+    bool isNavBased = product != null ? (product['is_nav_based'] == 1 || product['is_nav_based'] == true) : false;
+    final riskController = TextEditingController(text: product?['risk_level']?.toString() ?? '');
+    final minRedeemController = TextEditingController(text: product?['min_redeem_unit']?.toString() ?? '');
+    final principalController = TextEditingController(text: product?['principal']?.toString() ?? '');
+    final expectedYieldController = TextEditingController(text: product?['expected_yield']?.toString() ?? '');
+    final startController = TextEditingController(text: product?['start_date'] ?? '');
+    final endController = TextEditingController(text: product?['end_date'] ?? '');
+    final payFreqController = TextEditingController(text: product?['pay_freq'] ?? '');
+    final statusController = TextEditingController(text: product?['status'] ?? 'active');
+    final remarkController = TextEditingController(text: product?['remark'] ?? '');
 
-    final isNew = insurance == null;
+    final isNew = product == null;
     final result = await showDialog<bool>(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text(isNew ? '新增保险产品' : '编辑保险产品'),
+          title: Text(isNew ? '新增理财产品' : '编辑理财产品'),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -68,12 +69,12 @@ class _InsurancePageState extends State<InsurancePage> {
                   decoration: const InputDecoration(labelText: '所属账户'),
                 ),
                 TextField(
-                  controller: productNameController,
+                  controller: nameController,
                   decoration: const InputDecoration(labelText: '产品名称'),
                 ),
                 TextField(
-                  controller: companyController,
-                  decoration: const InputDecoration(labelText: '保险公司'),
+                  controller: codeController,
+                  decoration: const InputDecoration(labelText: '产品代码'),
                 ),
                 TextField(
                   controller: typeController,
@@ -83,24 +84,30 @@ class _InsurancePageState extends State<InsurancePage> {
                   controller: currencyController,
                   decoration: const InputDecoration(labelText: '币种'),
                 ),
-                TextField(
-                  controller: premiumController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: '保费'),
+                SwitchListTile(
+                  value: isNavBased,
+                  title: const Text('净值型产品'),
+                  onChanged: (value) => setState(() => isNavBased = value),
                 ),
                 TextField(
-                  controller: premiumFreqController,
-                  decoration: const InputDecoration(labelText: '保费周期'),
+                  controller: riskController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: '风险等级'),
                 ),
                 TextField(
-                  controller: premiumYearsController,
+                  controller: minRedeemController,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: '缴费年限'),
+                  decoration: const InputDecoration(labelText: '最低赎回单位'),
                 ),
                 TextField(
-                  controller: coverageController,
+                  controller: principalController,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: '保额'),
+                  decoration: const InputDecoration(labelText: '本金'),
+                ),
+                TextField(
+                  controller: expectedYieldController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: '预期收益'),
                 ),
                 TextField(
                   controller: startController,
@@ -111,9 +118,8 @@ class _InsurancePageState extends State<InsurancePage> {
                   decoration: const InputDecoration(labelText: '结束日期 (YYYY-MM-DD)'),
                 ),
                 TextField(
-                  controller: cashValueController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: '现金价值'),
+                  controller: payFreqController,
+                  decoration: const InputDecoration(labelText: '支付频率'),
                 ),
                 TextField(
                   controller: statusController,
@@ -133,38 +139,37 @@ class _InsurancePageState extends State<InsurancePage> {
             ),
             ElevatedButton(
               onPressed: () async {
-                if (selectedAccountId == null || productNameController.text.trim().isEmpty) {
+                if (selectedAccountId == null || nameController.text.trim().isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('请填写产品名称和所属账户')));
                   return;
                 }
 
                 final params = {
                   'account_id': selectedAccountId,
-                  'product_name': productNameController.text.trim(),
-                  'company': companyController.text.trim(),
+                  'product_name': nameController.text.trim(),
+                  'product_code': codeController.text.trim(),
                   'type': typeController.text.trim(),
                   'currency': currencyController.text.trim().isEmpty ? 'CNY' : currencyController.text.trim(),
-                  'premium': double.tryParse(premiumController.text) ?? 0,
-                  'premium_freq': premiumFreqController.text.trim(),
-                  'premium_years': int.tryParse(premiumYearsController.text) ?? 0,
-                  'coverage_amount': double.tryParse(coverageController.text) ?? 0,
+                  'is_nav_based': isNavBased,
+                  'risk_level': int.tryParse(riskController.text),
+                  'min_redeem_unit': double.tryParse(minRedeemController.text),
+                  'principal': double.tryParse(principalController.text),
+                  'expected_yield': double.tryParse(expectedYieldController.text),
                   'start_date': startController.text.trim(),
                   'end_date': endController.text.trim(),
-                  'cash_value': double.tryParse(cashValueController.text) ?? 0,
+                  'pay_freq': payFreqController.text.trim(),
                   'status': statusController.text.trim().isEmpty ? 'active' : statusController.text.trim(),
                   'remark': remarkController.text.trim(),
                 };
 
-                final action = isNew ? 'insurance_create' : 'insurance_update';
+                final action = isNew ? 'financial_product_create' : 'financial_product_update';
                 if (!isNew) {
-                  params['id'] = insurance['id'];
+                  params['id'] = product['id'];
                 }
-
                 final response = await ApiClient.operate(action, params);
                 if (!context.mounted) return;
-                final navigatorContext = this.context;
-                final messenger = ScaffoldMessenger.of(navigatorContext);
-                final navigator = Navigator.of(navigatorContext);
+                final messenger = ScaffoldMessenger.of(context);
+                final navigator = Navigator.of(context);
                 if (response.containsKey('error')) {
                   messenger.showSnackBar(SnackBar(content: Text(response['error'].toString())));
                   return;
@@ -184,13 +189,13 @@ class _InsurancePageState extends State<InsurancePage> {
     }
   }
 
-  Future<void> _deleteInsurance(Map<String, dynamic> insurance) async {
+  Future<void> _deleteProduct(Map<String, dynamic> product) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('删除保险产品'),
-          content: Text('确认删除保险产品 ${insurance['product_name'] ?? ''} 吗？'),
+          title: const Text('删除理财产品'),
+          content: Text('确认删除理财产品 ${product['product_name'] ?? ''} 吗？'),
           actions: [
             TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('取消')),
             ElevatedButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('删除')),
@@ -203,7 +208,7 @@ class _InsurancePageState extends State<InsurancePage> {
       return;
     }
 
-    final response = await ApiClient.operate('insurance_delete', {'id': insurance['id']});
+    final response = await ApiClient.operate('financial_product_delete', {'id': product['id']});
     if (!context.mounted) return;
     final messenger = ScaffoldMessenger.of(context);
     if (response.containsKey('error')) {
@@ -235,12 +240,12 @@ class _InsurancePageState extends State<InsurancePage> {
                   children: [
                     const Expanded(
                       child: Text(
-                        '保险产品',
+                        '理财产品',
                         style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                       ),
                     ),
                     ElevatedButton.icon(
-                      onPressed: () => _showInsuranceDialog(),
+                      onPressed: () => _showProductDialog(),
                       icon: const Icon(Icons.add),
                       label: const Text('新增'),
                     ),
@@ -249,25 +254,25 @@ class _InsurancePageState extends State<InsurancePage> {
               ),
               Expanded(
                 child: data.isEmpty
-                    ? const Center(child: Text('暂无保险产品'))
+                    ? const Center(child: Text('暂无理财产品'))
                     : ListView.builder(
                         itemCount: data.length,
                         itemBuilder: (context, i) {
                           final row = data[i] as Map<String, dynamic>;
                           return ListTile(
-                            title: Text(row['product_name'] ?? '保险产品'),
-                            subtitle: Text('${row['company'] ?? ''} · 保费 ${row['premium'] ?? ''} · ${row['premium_freq'] ?? ''}'),
+                            title: Text(row['product_name'] ?? '理财产品'),
+                            subtitle: Text('${row['type'] ?? ''} · ${row['product_code'] ?? ''} · 本金 ${row['principal'] ?? ''}'),
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 ElevatedButton.icon(
                                   icon: const Icon(Icons.edit, size: 20),
-                                  onPressed: () => _showInsuranceDialog(insurance: row),
+                                  onPressed: () => _showProductDialog(product: row),
                                   label: const Text('编辑'),
                                 ),
                                 ElevatedButton.icon(
                                   icon: const Icon(Icons.delete, size: 20),
-                                  onPressed: () => _deleteInsurance(row),
+                                  onPressed: () => _deleteProduct(row),
                                   label: const Text('删除'),
                                 ),
                               ],

@@ -240,7 +240,159 @@ class AssetOperator:
         return {"status": "success"}
 
     # ============================
-    # 6. 新增账户
+    # 7. 保险产品 CRUD
+    # ============================
+    def create_insurance_product(
+        self,
+        account_id,
+        product_name,
+        company,
+        type,
+        currency="CNY",
+        premium=0,
+        premium_freq="annual",
+        premium_years=0,
+        coverage_amount=0,
+        start_date=None,
+        end_date=None,
+        cash_value=0,
+        status="active",
+        remark=None,
+    ):
+        self.session.execute(text("""
+            INSERT INTO insurance_products (
+                account_id, product_name, company, type, currency,
+                premium, premium_freq, premium_years, coverage_amount,
+                start_date, end_date, cash_value, status, remark
+            ) VALUES (
+                :account_id, :product_name, :company, :type, :currency,
+                :premium, :premium_freq, :premium_years, :coverage_amount,
+                :start_date, :end_date, :cash_value, :status, :remark
+            )
+        """), {
+            "account_id": account_id,
+            "product_name": product_name,
+            "company": company,
+            "type": type,
+            "currency": currency,
+            "premium": premium,
+            "premium_freq": premium_freq,
+            "premium_years": premium_years,
+            "coverage_amount": coverage_amount,
+            "start_date": start_date,
+            "end_date": end_date,
+            "cash_value": cash_value,
+            "status": status,
+            "remark": remark,
+        })
+        self.session.commit()
+        return {"status": "success", "message": f"保险产品 {product_name} 已创建"}
+
+    def update_insurance_product(self, id, **kwargs):
+        fields = []
+        params = {"id": id}
+        allowed_fields = [
+            "account_id", "product_name", "company", "type", "currency",
+            "premium", "premium_freq", "premium_years", "coverage_amount",
+            "start_date", "end_date", "cash_value", "status", "remark"
+        ]
+        for key in allowed_fields:
+            if key in kwargs:
+                fields.append(f"{key} = :{key}")
+                params[key] = kwargs[key]
+        if not fields:
+            return {"error": "没有需要更新的字段"}
+        sql = f"UPDATE insurance_products SET {', '.join(fields)} WHERE id=:id"
+        self.session.execute(text(sql), params)
+        self.session.commit()
+        return {"status": "success", "message": f"保险产品 {id} 已更新"}
+
+    def delete_insurance_product(self, id):
+        self.session.execute(text("""
+            DELETE FROM insurance_products WHERE id=:id
+        """), {"id": id})
+        self.session.commit()
+        return {"status": "success", "message": f"保险产品 ID={id} 已删除"}
+
+    # ============================
+    # 8. 理财产品 CRUD
+    # ============================
+    def create_financial_product(
+        self,
+        account_id,
+        product_name,
+        product_code,
+        type,
+        currency="CNY",
+        is_nav_based=False,
+        risk_level=None,
+        min_redeem_unit=None,
+        principal=None,
+        expected_yield=None,
+        start_date=None,
+        end_date=None,
+        pay_freq=None,
+        status="active",
+        remark=None,
+    ):
+        self.session.execute(text("""
+            INSERT INTO financial_products (
+                account_id, product_name, product_code, type, currency,
+                is_nav_based, risk_level, min_redeem_unit, principal,
+                expected_yield, start_date, end_date, pay_freq, status, remark
+            ) VALUES (
+                :account_id, :product_name, :product_code, :type, :currency,
+                :is_nav_based, :risk_level, :min_redeem_unit, :principal,
+                :expected_yield, :start_date, :end_date, :pay_freq, :status, :remark
+            )
+        """), {
+            "account_id": account_id,
+            "product_name": product_name,
+            "product_code": product_code,
+            "type": type,
+            "currency": currency,
+            "is_nav_based": is_nav_based,
+            "risk_level": risk_level,
+            "min_redeem_unit": min_redeem_unit,
+            "principal": principal,
+            "expected_yield": expected_yield,
+            "start_date": start_date,
+            "end_date": end_date,
+            "pay_freq": pay_freq,
+            "status": status,
+            "remark": remark,
+        })
+        self.session.commit()
+        return {"status": "success", "message": f"理财产品 {product_name} 已创建"}
+
+    def update_financial_product(self, id, **kwargs):
+        fields = []
+        params = {"id": id}
+        allowed_fields = [
+            "account_id", "product_name", "product_code", "type", "currency",
+            "is_nav_based", "risk_level", "min_redeem_unit", "principal",
+            "expected_yield", "start_date", "end_date", "pay_freq", "status", "remark"
+        ]
+        for key in allowed_fields:
+            if key in kwargs:
+                fields.append(f"{key} = :{key}")
+                params[key] = kwargs[key]
+        if not fields:
+            return {"error": "没有需要更新的字段"}
+        sql = f"UPDATE financial_products SET {', '.join(fields)} WHERE id=:id"
+        self.session.execute(text(sql), params)
+        self.session.commit()
+        return {"status": "success", "message": f"理财产品 {id} 已更新"}
+
+    def delete_financial_product(self, id):
+        self.session.execute(text("""
+            DELETE FROM financial_products WHERE id=:id
+        """), {"id": id})
+        self.session.commit()
+        return {"status": "success", "message": f"理财产品 ID={id} 已删除"}
+
+    # ============================
+    # 9. 新增账户
     # ============================
     def create_account(self, name, institution, type, currency="CNY"):
         self.session.execute(text("""

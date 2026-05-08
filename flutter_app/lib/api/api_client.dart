@@ -54,7 +54,16 @@ class ApiClient {
     }
   }
 
-    static Future<Map<String, dynamic>> getSummary() async {
+  static Future<List<dynamic>> getFinancialProducts() async {
+    final resp = await http.get(Uri.parse('$baseUrl/financial_products'));
+    if (resp.statusCode == 200) {
+      return jsonDecode(resp.body) as List<dynamic>;
+    } else {
+      throw Exception('Financial products API error');
+    }
+  }
+
+  static Future<Map<String, dynamic>> getSummary() async {
     final resp = await http.get(Uri.parse('$baseUrl/summary'));
     if (resp.statusCode == 200) {
       return jsonDecode(resp.body) as Map<String, dynamic>;
@@ -63,4 +72,16 @@ class ApiClient {
     }
   }
 
+  static Future<Map<String, dynamic>> operate(String action, Map<String, dynamic> params) async {
+    final resp = await http.post(
+      Uri.parse('$baseUrl/operate'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'action': action, 'params': params}),
+    );
+    if (resp.statusCode == 200) {
+      return jsonDecode(resp.body) as Map<String, dynamic>;
+    } else {
+      throw Exception('Operate API error: ${resp.statusCode}');
+    }
+  }
 }

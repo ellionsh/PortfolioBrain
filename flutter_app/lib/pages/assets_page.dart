@@ -17,6 +17,12 @@ class _AssetsPageState extends State<AssetsPage> {
     _future = _load();
   }
 
+  Future<void> _refresh() async {
+    setState(() {
+      _future = _load();
+    });
+  }
+
   Future<_AssetsData> _load() async {
     final accounts = await ApiClient.getAccounts();
     final deposits = await ApiClient.getBankDeposits();
@@ -36,6 +42,149 @@ class _AssetsPageState extends State<AssetsPage> {
     );
   }
 
+  Future<void> _showDepositDialog({Map<String, dynamic>? deposit, required Map<int, String> accountNames}) async {
+    final accountChoices = accountNames.entries.toList();
+
+    int? selectedAccountId = deposit != null ? (deposit['account_id'] as num?)?.toInt() : null;
+    final typeController = TextEditingController(text: deposit?['deposit_type'] ?? '');
+    final principalController = TextEditingController(text: deposit?['principal']?.toString() ?? '');
+    final rateController = TextEditingController(text: deposit != null?(((deposit['interest_rate'] as num?)?.toDouble() ?? 0) * 100).toStringAsFixed(2):'');
+    final startController = TextEditingController(text: deposit?['start_date'] ?? '');
+    final endController = TextEditingController(text: deposit?['end_date'] ?? '');
+    final currencyController = TextEditingController(text: deposit?['currency'] ?? 'CNY');
+
+    final isNew = deposit == null;
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(isNew ? '新增银行存款' : '编辑银行存款'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<int>(
+                  initialValue: selectedAccountId,
+                  items: accountChoices
+                      .map((entry) => DropdownMenuItem<int>(
+                            value: entry.key,
+                            child: Text(entry.value),
+                          ))
+                      .toList(),
+                  onChanged: (value) => selectedAccountId = value,
+                  decoration: const InputDecoration(labelText: '所属账户'),
+                ),
+                TextField(
+                  controller: typeController,
+                  decoration: const InputDecoration(labelText: '存款类型'),
+                ),
+                TextField(
+                  controller: principalController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: '本金'),
+                ),
+                TextField(
+                  controller: rateController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: '利率 (%)'),
+                ),
+                TextField(
+                  controller: startController,
+                  decoration: const InputDecoration(labelText: '开始日期 (YYYY-MM-DD)'),
+                ),
+                TextField(
+                  controller: endController,
+                  decoration: const InputDecoration(labelText: '结束日期 (YYYY-MM-DD)'),
+                ),
+                TextField(
+                  controller: currencyController,
+                  decoration: const InputDecoration(labelText: '币种'),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('取消'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (selectedAccountId == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('请选择所属账户')));
+                  return;
+                }
+
+                final messenger = ScaffoldMessenger.of(context);
+                final navigator = Navigator.of(context);
+                final principal = double.tryParse(principalController.text) ?? 0;
+                final rate = (double.tryParse(rateController.text) ?? 0) / 100;
+                final params = {
+                  'account_id': selectedAccountId,
+                  'deposit_type': typeController.text.trim(),
+                  'principal': principal,
+                  'interest_rate': rate,
+                  'start_date': startController.text.trim(),
+                  'end_date': endController.text.trim(),
+                  'currency': currencyController.text.trim().isEmpty ? 'CNY' : currencyController.text.trim(),
+                };
+
+                final action = isNew ? 'bank_deposit_add' : 'bank_deposit_update';
+                if (!isNew) {
+                  params['id'] = deposit['id'];
+                }
+
+                final response = await ApiClient.operate(action, params);
+                if (!mounted) return;
+                if (response.containsKey('error')) {
+                  messenger.showSnackBar(SnackBar(content: Text(response['error'].toString())));
+                  return;
+                }
+
+                navigator.pop(true);
+              },
+              child: Text(isNew ? '新增' : '保存'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (result == true) {
+      await _refresh();
+    }
+  }
+
+  Future<void> _deleteDeposit(Map<String, dynamic> deposit) async {
+    final dialogContext = context;
+    final messenger = ScaffoldMessenger.of(dialogContext);
+    final confirmed = await showDialog<bool>(
+      context: dialogContext,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('删除银行存款'),
+          content: const Text('确认删除这条银行存款吗？'),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('取消')),
+            ElevatedButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('删除')),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) {
+      return;
+    }
+
+    final response = await ApiClient.operate('bank_deposit_delete', {'id': deposit['id']});
+    if (response.containsKey('error')) {
+      messenger.showSnackBar(SnackBar(content: Text(response['error'].toString())));
+      return;
+    }
+
+    await _refresh();
+  }
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -50,7 +199,29 @@ class _AssetsPageState extends State<AssetsPage> {
           }
 
           final data = snapshot.data!;
-          return _buildList(data);
+          return Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        '资产明细',
+                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: () => _showDepositDialog(accountNames: data.accountNames),
+                      icon: const Icon(Icons.add),
+                      label: const Text('新增'),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(child: _buildList(data)),
+            ],
+          );
         },
       ),
     );
@@ -88,7 +259,22 @@ class _AssetsPageState extends State<AssetsPage> {
 
             return ListTile(
               title: Text('$type · 本金 ¥${principal.toStringAsFixed(2)}'),
-              subtitle: Text('利率 ${rate * 100}%\n$start ~ $end'),
+              subtitle: Text('利率 ${ (rate * 100).toStringAsFixed(2) }%\n$start ~ $end'),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.edit, size: 20),
+                    onPressed: () => _showDepositDialog(deposit: m, accountNames: d.accountNames),
+                    label: const Text('编辑'),
+                  ),
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.delete, size: 20),
+                    onPressed: () => _deleteDeposit(m),
+                    label: const Text('删除'),
+                  ),
+                ],
+              ),
             );
           }).toList(),
         );

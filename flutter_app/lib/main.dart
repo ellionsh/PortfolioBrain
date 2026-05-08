@@ -4,6 +4,7 @@ import 'pages/accounts_page.dart';
 import 'pages/assets_page.dart';
 import 'pages/cashflow_page.dart';
 import 'pages/insurance_page.dart';
+import 'pages/financial_products_page.dart';
 import 'pages/agent_chat_page.dart';
 
 void main() {
@@ -26,6 +27,7 @@ class _PortfolioBrainAppState extends State<PortfolioBrainApp> {
     AssetsPage(),
     CashflowPage(),
     InsurancePage(),
+    FinancialProductsPage(),
     AgentChatPage(),
   ];
 
@@ -49,6 +51,7 @@ class _PortfolioBrainAppState extends State<PortfolioBrainApp> {
             BottomNavigationBarItem(icon: Icon(Icons.pie_chart), label: '资产'),
             BottomNavigationBarItem(icon: Icon(Icons.timeline), label: '现金流'),
             BottomNavigationBarItem(icon: Icon(Icons.shield), label: '保险'),
+            BottomNavigationBarItem(icon: Icon(Icons.trending_up), label: '理财'),
             BottomNavigationBarItem(icon: Icon(Icons.chat), label: '助手'),
           ],
         ),
