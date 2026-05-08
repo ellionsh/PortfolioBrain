@@ -305,7 +305,7 @@ class AssetOperator:
     # ============================
     
     # --- 9.1 更新银行存款本金（余额） ---
-    def update_bank_deposit_principal(self, id, new_principal):
+    def update_bank_deposit_principal(self, id, principal):
         """更新银行存款的本金（余额）"""
         try:
             self.session.execute(text("""
@@ -313,11 +313,11 @@ class AssetOperator:
                 SET principal=:p
                 WHERE id=:id
             """), {
-                "p": new_principal,
+                "p": principal,
                 "id": id
             })
             self.session.commit()
-            return {"status": "success", "message": f"银行存款 ID={id} 本金已更新为 {new_principal}"}
+            return {"status": "success", "message": f"银行存款 ID={id} 本金已更新为 {principal}"}
         except Exception as e:
             self.session.rollback()
             return {"error": str(e)}
