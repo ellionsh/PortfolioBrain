@@ -51,7 +51,7 @@ tools = [
         "type": "function",
         "function": {
             "name": "run_sql",
-            "description": "执行 SELECT SQL 查询（必须带 LIMIT）",
+            "description": "执行 SELECT SQL 查询",
             "parameters": {
                 "type": "object",
                 "properties": {
