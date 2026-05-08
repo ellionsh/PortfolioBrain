@@ -181,13 +181,13 @@ class AssetOperator:
         return {"status": "success"}
 
     # --- 银行存款支取 ---
-    def _sell_bank_deposit(self, deposit_id, amount, date):
+    def _sell_bank_deposit(self, id, amount, date):
         try:
             self.session.execute(text("""
                 UPDATE bank_deposits
                 SET status='redeemed'
                 WHERE id=:id
-            """), {"id": deposit_id})
+            """), {"id": id})
 
             self.session.commit()
             return {"status": "success", "message": f"银行存款已提取，金额：{amount}"}
@@ -305,7 +305,7 @@ class AssetOperator:
     # ============================
     
     # --- 9.1 更新银行存款本金（余额） ---
-    def update_bank_deposit_principal(self, deposit_id, new_principal):
+    def update_bank_deposit_principal(self, id, new_principal):
         """更新银行存款的本金（余额）"""
         try:
             self.session.execute(text("""
@@ -314,10 +314,10 @@ class AssetOperator:
                 WHERE id=:id
             """), {
                 "p": new_principal,
-                "id": deposit_id
+                "id": id
             })
             self.session.commit()
-            return {"status": "success", "message": f"银行存款 ID={deposit_id} 本金已更新为 {new_principal}"}
+            return {"status": "success", "message": f"银行存款 ID={id} 本金已更新为 {new_principal}"}
         except Exception as e:
             self.session.rollback()
             return {"error": str(e)}
@@ -353,16 +353,16 @@ class AssetOperator:
             return {"error": str(e)}
 
     # --- 9.3 提取银行存款 ---
-    def withdraw_bank_deposit(self, deposit_id, withdraw_amount):
+    def withdraw_bank_deposit(self, id, withdraw_amount):
         """提取银行存款（更新本金）"""
         try:
             # 先获取当前本金
             result = self.session.execute(text("""
                 SELECT principal FROM bank_deposits WHERE id=:id
-            """), {"id": deposit_id}).fetchone()
+            """), {"id": id}).fetchone()
 
             if not result:
-                return {"error": f"银行存款 ID={deposit_id} 不存在"}
+                return {"error": f"银行存款 ID={id} 不存在"}
 
             current_principal = float(result[0])
             new_principal = current_principal - withdraw_amount
@@ -376,7 +376,7 @@ class AssetOperator:
                 WHERE id=:id
             """), {
                 "p": new_principal,
-                "id": deposit_id
+                "id": id
             })
             self.session.commit()
             return {
@@ -388,11 +388,11 @@ class AssetOperator:
             return {"error": str(e)}
 
     # --- 9.4 更新银行存款信息 ---
-    def update_bank_deposit(self, deposit_id, **kwargs):
+    def update_bank_deposit(self, id, **kwargs):
         """更新银行存款的各项信息"""
         try:
             fields = []
-            params = {"id": deposit_id}
+            params = {"id": id}
 
             # 允许更新的字段
             allowed_fields = [
@@ -413,13 +413,13 @@ class AssetOperator:
             self.session.execute(text(sql), params)
             self.session.commit()
 
-            return {"status": "success", "message": f"银行存款 ID={deposit_id} 已更新"}
+            return {"status": "success", "message": f"银行存款 ID={id} 已更新"}
         except Exception as e:
             self.session.rollback()
             return {"error": str(e)}
 
     # --- 9.5 获取银行存款信息 ---
-    def get_bank_deposit(self, deposit_id):
+    def get_bank_deposit(self, id):
         """获取银行存款详情"""
         try:
             result = self.session.execute(text("""
@@ -427,10 +427,10 @@ class AssetOperator:
                        start_date, end_date, interest_method, notice_days, auto_renew, status, remark
                 FROM bank_deposits
                 WHERE id=:id
-            """), {"id": deposit_id}).fetchone()
+            """), {"id": id}).fetchone()
 
             if not result:
-                return {"error": f"银行存款 ID={deposit_id} 不存在"}
+                return {"error": f"银行存款 ID={id} 不存在"}
 
             columns = [
                 "id", "account_id", "deposit_type", "currency", "principal", 
@@ -468,14 +468,14 @@ class AssetOperator:
             return {"error": str(e)}
 
     # --- 9.7 删除银行存款 ---
-    def delete_bank_deposit(self, deposit_id):
+    def delete_bank_deposit(self, id):
         """删除银行存款"""
         try:
             self.session.execute(text("""
                 DELETE FROM bank_deposits WHERE id=:id
-            """), {"id": deposit_id})
+            """), {"id": id})
             self.session.commit()
-            return {"status": "success", "message": f"银行存款 ID={deposit_id} 已删除"}
+            return {"status": "success", "message": f"银行存款 ID={id} 已删除"}
         except Exception as e:
             self.session.rollback()
             return {"error": str(e)}

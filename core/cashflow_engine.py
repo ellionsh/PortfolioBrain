@@ -43,7 +43,7 @@ class CashflowEngine:
         """)).fetchall()
 
         for r in rows:
-            deposit_id, account_id, principal, rate, start, end, dtype = r
+            id, account_id, principal, rate, start, end, dtype = r
 
             if dtype == "demand":
                 continue
@@ -57,7 +57,7 @@ class CashflowEngine:
                 WHERE source_type='bank'
                 AND source_id=:id
                 AND date=:d
-            """), {"id": deposit_id, "d": end}).scalar()
+            """), {"id": id, "d": end}).scalar()
 
             if exists > 0:
                 continue
@@ -69,7 +69,7 @@ class CashflowEngine:
                     amount, currency, direction, description
                 ) VALUES ('bank', :id, :aid, :d, :amt, 'CNY', 'inflow', '银行存款到期兑付')
             """), {
-                "id": deposit_id,
+                "id": id,
                 "aid": account_id,
                 "d": end,
                 "amt": principal + interest
