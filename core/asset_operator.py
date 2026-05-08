@@ -353,7 +353,7 @@ class AssetOperator:
             return {"error": str(e)}
 
     # --- 9.3 提取银行存款 ---
-    def withdraw_bank_deposit(self, id, withdraw_amount):
+    def withdraw_bank_deposit(self, id, amount):
         """提取银行存款（更新本金）"""
         try:
             # 先获取当前本金
@@ -365,10 +365,10 @@ class AssetOperator:
                 return {"error": f"银行存款 ID={id} 不存在"}
 
             current_principal = float(result[0])
-            new_principal = current_principal - withdraw_amount
+            new_principal = current_principal - amount
 
             if new_principal < 0:
-                return {"error": f"提取金额 {withdraw_amount} 超过当前本金 {current_principal}"}
+                return {"error": f"提取金额 {amount} 超过当前本金 {current_principal}"}
 
             self.session.execute(text("""
                 UPDATE bank_deposits
@@ -381,7 +381,7 @@ class AssetOperator:
             self.session.commit()
             return {
                 "status": "success",
-                "message": f"提取成功，提取金额：{withdraw_amount}，余额：{new_principal}"
+                "message": f"提取成功，提取金额：{amount}，余额：{new_principal}"
             }
         except Exception as e:
             self.session.rollback()
