@@ -17,7 +17,7 @@ from flask_cors import CORS
 import pandas as pd
 import config
 
-from agent.agent import agent_chat
+from agent.agent_v2 import agent_chat
 from core.asset_operator import AssetOperator
 from core.cashflow_engine import CashflowEngine
 from db.db import get_engine, get_session
