@@ -108,7 +108,8 @@ def agent_chat(user_query: str) -> str:
         model=config.DEEPSEEK_MODEL,
         messages=messages,
         tools=tools,
-        tool_choice="auto"
+        tool_choice="auto",
+        extra_body={"thinking": {"type": "disabled"}}
     )
     print("LLM Step1耗时:", time.time() - t0)
 
