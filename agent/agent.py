@@ -7,8 +7,8 @@ from skills.sql_skill import SQLSkill
 from skills.operation_skill import OperationSkill
 from agent.prompts import AGENT_SYSTEM_PROMPT
 import config
-
 import datetime
+import time
 
 def serialize(obj):
     if isinstance(obj, (datetime.date, datetime.datetime)):
@@ -117,14 +117,16 @@ def agent_chat(user_query: str) -> str:
         {"role": "system", "content": AGENT_SYSTEM_PROMPT},
         {"role": "user", "content": user_query},
     ]
-
+    start_total = time.time()
     while True:
+        t0 = time.time()
         resp = client.chat.completions.create(
             model=config.DEEPSEEK_MODEL,
             messages=messages,
             tools=tools,
             extra_body={"thinking": {"type": "disabled"}}
         )
+        print("LLM 耗时:", time.time() - t0)
 
         msg = resp.choices[0].message
 
@@ -150,6 +152,6 @@ def agent_chat(user_query: str) -> str:
                 })
 
             continue
-
+        print("总耗时:", time.time() - start_total)
         return msg.content
 
