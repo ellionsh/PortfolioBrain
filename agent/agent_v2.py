@@ -157,7 +157,8 @@ def agent_chat(user_query: str) -> str:
     t2 = time.time()
     final_resp = client.chat.completions.create(
         model=config.DEEPSEEK_MODEL,
-        messages=messages
+        messages=messages,
+        extra_body={"thinking": {"type": "disabled"}}
     )
     print("LLM Step2耗时:", time.time() - t2)
 
