@@ -152,7 +152,7 @@ def agent_chat(user_query: str) -> str:
     messages.extend(tool_results)
 
     # 控制上下文长度（关键优化）
-    messages = messages[-10:]
+    #messages = messages[-10:]
 
     t2 = time.time()
     final_resp = client.chat.completions.create(
