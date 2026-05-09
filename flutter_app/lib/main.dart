@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'pages/home_page.dart';
 import 'pages/accounts_page.dart';
-import 'pages/assets_page.dart';
+import 'pages/deposits_page.dart';
 import 'pages/cashflow_page.dart';
 import 'pages/insurance_page.dart';
 import 'pages/financial_products_page.dart';
@@ -24,10 +24,10 @@ class _PortfolioBrainAppState extends State<PortfolioBrainApp> {
   final _pages = const [
     HomePage(),
     AccountsPage(),
-    AssetsPage(),
-    CashflowPage(),
+    DepositsPage(),
     InsurancePage(),
     FinancialProductsPage(),
+    CashflowPage(),
     AgentChatPage(),
   ];
 
@@ -46,13 +46,13 @@ class _PortfolioBrainAppState extends State<PortfolioBrainApp> {
           type: BottomNavigationBarType.fixed,
           onTap: (i) => setState(() => _index = i),
           items: const [
-            BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: '首页'),
-            BottomNavigationBarItem(icon: Icon(Icons.account_balance), label: '账户'),
-            BottomNavigationBarItem(icon: Icon(Icons.pie_chart), label: '资产'),
-            BottomNavigationBarItem(icon: Icon(Icons.timeline), label: '现金流'),
-            BottomNavigationBarItem(icon: Icon(Icons.shield), label: '保险'),
-            BottomNavigationBarItem(icon: Icon(Icons.trending_up), label: '理财'),
-            BottomNavigationBarItem(icon: Icon(Icons.chat), label: '助手'),
+            BottomNavigationBarItem(icon: Icon(Icons.home), label: '首页'),
+            BottomNavigationBarItem(icon: Icon(Icons.account_balance_wallet), label: '账户'),
+            BottomNavigationBarItem(icon: Icon(Icons.savings), label: '存款'),
+            BottomNavigationBarItem(icon: Icon(Icons.health_and_safety), label: '保险'),
+            BottomNavigationBarItem(icon: Icon(Icons.show_chart), label: '理财'),
+            BottomNavigationBarItem(icon: Icon(Icons.receipt_long), label: '现金流'),
+            BottomNavigationBarItem(icon: Icon(Icons.smart_toy), label: '助手'),
           ],
         ),
       ),

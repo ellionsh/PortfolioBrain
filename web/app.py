@@ -133,16 +133,44 @@ def chat():
 # ============================
 @app.route("/summary", methods=["GET"])
 def summary():
-    df_assets = pd.read_sql("SELECT SUM(market_value) AS v FROM positions", engine)
+    # 银行存款本金
+    df_bank = pd.read_sql("""
+        SELECT SUM(principal) AS v 
+        FROM bank_deposits 
+        WHERE status='active'
+    """, engine)
+    bank_value = float(df_bank["v"][0] or 0)
+
+    # 理财产品本金
+    df_fp = pd.read_sql("""
+        SELECT SUM(principal) AS v 
+        FROM financial_products 
+        WHERE status='active'
+    """, engine)
+    fp_value = float(df_fp["v"][0] or 0)
+
+    # 保险现金价值
+    df_ins = pd.read_sql("""
+        SELECT SUM(cash_value) AS v 
+        FROM insurance_products 
+        WHERE status='active'
+    """, engine)
+    ins_value = float(df_ins["v"][0] or 0)
+
+    # 未来6个月现金流
     df_cf = pd.read_sql("""
         SELECT SUM(amount) AS v FROM cashflows
         WHERE date >= CURDATE()
         AND date < DATE_ADD(CURDATE(), INTERVAL 180 DAY)
     """, engine)
+    future_6m_cf = float(df_cf["v"][0] or 0)
 
     return {
-        "total_assets": float(df_assets["v"][0] or 0),
-        "future_6m_cf": float(df_cf["v"][0] or 0)
+        "total_assets": bank_value + fp_value + ins_value,
+        "bank_assets": bank_value,
+        "financial_products": fp_value,
+        "insurance_assets": ins_value,
+        "future_6m_cf": future_6m_cf
     }
 
 
