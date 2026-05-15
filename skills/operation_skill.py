@@ -95,6 +95,12 @@ class OperationSkill:
         # ============================
         # 5. 基金（Fund）
         # ============================
+        elif action == "fund_buy":
+            return self.op.buy("fund", **params)
+
+        elif action == "fund_sell":
+            return self.op.sell("fund", **params)
+
         elif action == "fund_product_create":
             return self.op.create_fund_product(**params)
 

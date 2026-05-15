@@ -24,6 +24,8 @@ class _FundProductsPageState extends State<FundProductsPage> {
     });
   }
 
+  String _today() => DateTime.now().toIso8601String().substring(0, 10);
+
   Future<void> _showFundDialog({Map<String, dynamic>? fund}) async {
     final accounts = await ApiClient.getAccounts();
     if (!mounted) return;
@@ -47,8 +49,13 @@ class _FundProductsPageState extends State<FundProductsPage> {
         TextEditingController(text: fund?['currency'] ?? 'CNY');
     final sharesController =
         TextEditingController(text: fund?['shares']?.toString() ?? '');
+    final navController =
+        TextEditingController(text: fund?['nav']?.toString() ?? '');
     final principalController =
         TextEditingController(text: fund?['principal']?.toString() ?? '');
+    final startController =
+        TextEditingController(text: fund?['start_date'] ?? '');
+    final endController = TextEditingController(text: fund?['end_date'] ?? '');
     final statusController =
         TextEditingController(text: fund?['status'] ?? 'active');
     final remarkController = TextEditingController(text: fund?['remark'] ?? '');
@@ -92,9 +99,24 @@ class _FundProductsPageState extends State<FundProductsPage> {
                   decoration: const InputDecoration(labelText: '当前份额'),
                 ),
                 TextField(
+                  controller: navController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: '净值'),
+                ),
+                TextField(
                   controller: principalController,
                   keyboardType: TextInputType.number,
                   decoration: const InputDecoration(labelText: '成本'),
+                ),
+                TextField(
+                  controller: startController,
+                  decoration:
+                      const InputDecoration(labelText: '开始日期 (YYYY-MM-DD)'),
+                ),
+                TextField(
+                  controller: endController,
+                  decoration:
+                      const InputDecoration(labelText: '结束日期 (YYYY-MM-DD)'),
                 ),
                 TextField(
                   controller: statusController,
@@ -130,15 +152,19 @@ class _FundProductsPageState extends State<FundProductsPage> {
                       ? 'CNY'
                       : currencyController.text.trim(),
                   'shares': double.tryParse(sharesController.text) ?? 0,
+                  'nav': double.tryParse(navController.text),
                   'principal':
                       double.tryParse(principalController.text) ?? 0,
+                  'start_date': startController.text.trim(),
+                  'end_date': endController.text.trim(),
                   'status': statusController.text.trim().isEmpty
                       ? 'active'
                       : statusController.text.trim(),
                   'remark': remarkController.text.trim(),
                 };
 
-                final action = isNew ? 'fund_product_create' : 'fund_product_update';
+                final action =
+                    isNew ? 'fund_product_create' : 'fund_product_update';
                 if (!isNew) {
                   params['id'] = fund['id'];
                 }
@@ -198,10 +224,227 @@ class _FundProductsPageState extends State<FundProductsPage> {
     if (!context.mounted) return;
     final messenger = ScaffoldMessenger.of(context);
     if (response.containsKey('error')) {
-      messenger.showSnackBar(SnackBar(content: Text(response['error'].toString())));
+      messenger.showSnackBar(
+        SnackBar(content: Text(response['error'].toString())),
+      );
       return;
     }
 
+    await _refresh();
+  }
+
+  Future<void> _buyFund(Map<String, dynamic> fund) async {
+    final amountController = TextEditingController();
+    final navController =
+        TextEditingController(text: fund['nav']?.toString() ?? '');
+    final dateController = TextEditingController(text: _today());
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('买入基金'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: amountController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: '买入金额',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: navController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: '买入净值',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: dateController,
+                  decoration: const InputDecoration(
+                    labelText: '买入日期 (YYYY-MM-DD)',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('取消'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final amount = double.tryParse(amountController.text);
+                final nav = double.tryParse(navController.text);
+                if (amount == null || amount <= 0 || nav == null || nav <= 0) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('请填写有效的买入金额和净值')),
+                  );
+                  return;
+                }
+                Navigator.of(context).pop(true);
+              },
+              child: const Text('买入'),
+            ),
+          ],
+        );
+      },
+    );
+
+    final amount = double.tryParse(amountController.text);
+    final nav = double.tryParse(navController.text);
+    final date = dateController.text.trim();
+    amountController.dispose();
+    navController.dispose();
+    dateController.dispose();
+
+    if (confirmed != true || amount == null || nav == null) {
+      return;
+    }
+
+    final accountId = fund['account_id'];
+    if (accountId == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('该基金缺少所属账户')),
+      );
+      return;
+    }
+
+    final response = await ApiClient.operate('fund_buy', {
+      'fund_id': fund['id'],
+      'account_id': accountId,
+      'amount': amount,
+      'nav': nav,
+      'date': date,
+    });
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    if (response.containsKey('error')) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(response['error'].toString())),
+      );
+      return;
+    }
+
+    messenger.showSnackBar(const SnackBar(content: Text('买入成功')));
+    await _refresh();
+  }
+
+  Future<void> _redeemFund(Map<String, dynamic> fund) async {
+    final sharesController =
+        TextEditingController(text: fund['shares']?.toString() ?? '');
+    final navController =
+        TextEditingController(text: fund['nav']?.toString() ?? '');
+    final dateController = TextEditingController(text: _today());
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('赎回基金'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: sharesController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: '赎回份额',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: navController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: '赎回净值',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: dateController,
+                  decoration: const InputDecoration(
+                    labelText: '赎回日期 (YYYY-MM-DD)',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('取消'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final shares = double.tryParse(sharesController.text);
+                final nav = double.tryParse(navController.text);
+                if (shares == null || shares <= 0 || nav == null || nav <= 0) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('请填写有效的赎回份额和净值')),
+                  );
+                  return;
+                }
+                Navigator.of(context).pop(true);
+              },
+              child: const Text('赎回'),
+            ),
+          ],
+        );
+      },
+    );
+
+    final shares = double.tryParse(sharesController.text);
+    final nav = double.tryParse(navController.text);
+    final date = dateController.text.trim();
+    sharesController.dispose();
+    navController.dispose();
+    dateController.dispose();
+
+    if (confirmed != true || shares == null || nav == null) {
+      return;
+    }
+
+    final accountId = fund['account_id'];
+    if (accountId == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('该基金缺少所属账户')),
+      );
+      return;
+    }
+
+    final response = await ApiClient.operate('fund_sell', {
+      'fund_id': fund['id'],
+      'account_id': accountId,
+      'shares': shares,
+      'nav': nav,
+      'date': date,
+    });
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    if (response.containsKey('error')) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(response['error'].toString())),
+      );
+      return;
+    }
+
+    messenger.showSnackBar(const SnackBar(content: Text('赎回成功')));
     await _refresh();
   }
 
@@ -230,10 +473,10 @@ class _FundProductsPageState extends State<FundProductsPage> {
                           TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                     ),
                   ),
-                  ElevatedButton.icon(
+                  IconButton.filled(
                     onPressed: () => _showFundDialog(),
+                    tooltip: '新增',
                     icon: const Icon(Icons.add),
-                    label: const Text('新增'),
                   ),
                 ],
               ),
@@ -248,20 +491,42 @@ class _FundProductsPageState extends State<FundProductsPage> {
                         return ListTile(
                           title: Text(row['fund_name'] ?? '基金产品'),
                           subtitle: Text(
-                            '${row['fund_code'] ?? ''} · 份额 ${row['shares'] ?? ''} · 成本 ${row['principal'] ?? ''}',
+                            [
+                              row['fund_code'] ?? '',
+                              '份额 ${row['shares'] ?? ''}',
+                              '净值 ${row['nav'] ?? ''}',
+                              '成本 ${row['principal'] ?? ''}',
+                              '${row['start_date'] ?? ''} ~ ${row['end_date'] ?? ''}',
+                            ].where((text) => text.toString().trim().isNotEmpty).join(' · '),
                           ),
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              ElevatedButton.icon(
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.add_shopping_cart,
+                                  size: 20,
+                                ),
+                                onPressed: () => _buyFund(row),
+                                tooltip: '买入',
+                              ),
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.currency_exchange,
+                                  size: 20,
+                                ),
+                                onPressed: () => _redeemFund(row),
+                                tooltip: '赎回',
+                              ),
+                              IconButton(
                                 icon: const Icon(Icons.edit, size: 20),
                                 onPressed: () => _showFundDialog(fund: row),
-                                label: const Text('编辑'),
+                                tooltip: '编辑',
                               ),
-                              ElevatedButton.icon(
+                              IconButton(
                                 icon: const Icon(Icons.delete, size: 20),
                                 onPressed: () => _deleteFund(row),
-                                label: const Text('删除'),
+                                tooltip: '删除',
                               ),
                             ],
                           ),

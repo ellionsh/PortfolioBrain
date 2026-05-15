@@ -74,6 +74,42 @@ class AssetOperator:
         self.session.commit()
         return {"status": "success"}
 
+    def _buy_fund(self, fund_id, account_id, amount, nav, date):
+        shares = amount / nav
+        self.session.execute(text("""
+            INSERT INTO fund_transactions (
+                fund_id, account_id, trade_date, trade_type,
+                shares, amount, nav, currency
+            ) VALUES (:fid, :aid, :date, 'buy', :shares, :amount, :nav, 'CNY')
+        """), {
+            "fid": fund_id,
+            "aid": account_id,
+            "date": date,
+            "shares": shares,
+            "amount": amount,
+            "nav": nav,
+        })
+        self.session.execute(text("""
+            UPDATE fund_products
+            SET shares = COALESCE(shares,0) + :shares,
+                principal = COALESCE(principal,0) + :amount,
+                start_date = COALESCE(start_date, :date),
+                status='active'
+            WHERE id=:fid
+        """), {
+            "shares": shares,
+            "amount": amount,
+            "date": date,
+            "fid": fund_id,
+        })
+        self.session.execute(text("""
+            INSERT INTO fund_navs (fund_id, date, nav, currency)
+            VALUES (:fid, :date, :nav, 'CNY')
+            ON DUPLICATE KEY UPDATE nav=:nav
+        """), {"fid": fund_id, "date": date, "nav": nav})
+        self.session.commit()
+        return {"status": "success", "shares": float(shares)}
+
     # --- 银行存款买入 ---
     def _buy_bank_deposit(self, account_id, deposit_type, principal, rate, start_date, end_date, currency="CNY", **kwargs):
         try:
@@ -195,6 +231,11 @@ class AssetOperator:
             SET shares = shares - :shares
             WHERE id=:fid
         """), {"shares": shares, "fid": fund_id})
+        self.session.execute(text("""
+            INSERT INTO fund_navs (fund_id, date, nav, currency)
+            VALUES (:fid, :date, :nav, 'CNY')
+            ON DUPLICATE KEY UPDATE nav=:nav
+        """), {"fid": fund_id, "date": date, "nav": nav})
         self.session.commit()
         return {"status": "success", "amount": float(amount)}
 
@@ -457,30 +498,74 @@ class AssetOperator:
     # 4. CRUD 方法（基金）
     # ============================
     def create_fund_product(self, account_id, fund_name, fund_code, currency="CNY",
-                            shares=0, principal=0, status="active", remark=None):
+                            shares=0, principal=0, nav=None, start_date=None,
+                            end_date=None, status="active", remark=None):
+        start_date = start_date or None
+        end_date = end_date or None
         self.session.execute(text("""
             INSERT INTO fund_products (
                 account_id, fund_name, fund_code, currency,
-                shares, principal, status, remark
-            ) VALUES (:aid, :name, :code, :currency, :shares, :principal, :status, :remark)
+                shares, principal, start_date, end_date, status, remark
+            ) VALUES (
+                :aid, :name, :code, :currency, :shares, :principal,
+                :start_date, :end_date, :status, :remark
+            )
         """), {"aid": account_id, "name": fund_name, "code": fund_code,
                "currency": currency, "shares": shares, "principal": principal,
+               "start_date": start_date, "end_date": end_date,
                "status": status, "remark": remark})
+        fund_id = self.session.execute(text("SELECT LAST_INSERT_ID()")).scalar()
+        if nav is not None:
+            self.session.execute(text("""
+                INSERT INTO fund_navs (fund_id, date, nav, currency)
+                VALUES (:fid, COALESCE(:start_date, CURDATE()), :nav, :currency)
+                ON DUPLICATE KEY UPDATE nav=:nav
+            """), {
+                "fid": fund_id,
+                "start_date": start_date,
+                "nav": nav,
+                "currency": currency,
+            })
         self.session.commit()
-        return {"status": "success", "message": f"基金产品 {fund_name} 已创建"}
+        return {
+            "status": "success",
+            "id": fund_id,
+            "message": f"基金产品 {fund_name} 已创建",
+        }
 
     def update_fund_product(self, id, **kwargs):
+        nav = kwargs.pop("nav", None)
+        currency = kwargs.get("currency", "CNY")
+        if kwargs.get("start_date") == "":
+            kwargs["start_date"] = None
+        if kwargs.get("end_date") == "":
+            kwargs["end_date"] = None
+        nav_date = kwargs.get("start_date")
         fields, params = [], {"id": id}
         allowed = ["account_id", "fund_name", "fund_code", "currency",
-                   "shares", "principal", "status", "remark"]
+                   "shares", "principal", "start_date", "end_date",
+                   "status", "remark"]
         for key in allowed:
             if key in kwargs:
                 fields.append(f"{key} = :{key}")
                 params[key] = kwargs[key]
         if not fields:
-            return {"error": "没有需要更新的字段"}
-        sql = f"UPDATE fund_products SET {', '.join(fields)} WHERE id=:id"
-        self.session.execute(text(sql), params)
+            if nav is None:
+                return {"error": "没有需要更新的字段"}
+        else:
+            sql = f"UPDATE fund_products SET {', '.join(fields)} WHERE id=:id"
+            self.session.execute(text(sql), params)
+        if nav is not None:
+            self.session.execute(text("""
+                INSERT INTO fund_navs (fund_id, date, nav, currency)
+                VALUES (:id, COALESCE(:date, CURDATE()), :nav, :currency)
+                ON DUPLICATE KEY UPDATE nav=:nav
+            """), {
+                "id": id,
+                "date": nav_date,
+                "nav": nav,
+                "currency": currency,
+            })
         self.session.commit()
         return {"status": "success", "message": f"基金产品 {id} 已更新"}
 

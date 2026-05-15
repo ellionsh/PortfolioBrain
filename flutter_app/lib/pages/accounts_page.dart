@@ -153,10 +153,10 @@ class _AccountsPageState extends State<AccountsPage> {
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
                 ),
-                ElevatedButton.icon(
+                IconButton.filled(
                   onPressed: () => _showAccountDialog(),
+                  tooltip: '新增',
                   icon: const Icon(Icons.add),
-                  label: const Text('新增'),
                 ),
               ],
             ),
@@ -186,16 +186,16 @@ class _AccountsPageState extends State<AccountsPage> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(row['currency'] ?? 'CNY'),
-                          ElevatedButton.icon(
+                          IconButton(
                             onPressed: () => _showAccountDialog(account: row),
                             icon: const Icon(Icons.edit, size: 20),
-                            label: const Text('编辑'),
+                            tooltip: '编辑',
                           ),
 
-                          ElevatedButton.icon(
+                          IconButton(
                             onPressed: () => _deleteAccount(row),
                             icon: const Icon(Icons.delete, size: 20),
-                            label: const Text('删除'),
+                            tooltip: '删除',
                           ),
                         ],
                       ),

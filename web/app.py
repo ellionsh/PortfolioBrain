@@ -89,7 +89,8 @@ def get_insurance_products():
     df = pd.read_sql("""
         SELECT id, account_id, product_name, company, type,
                premium, premium_freq, premium_years,
-               coverage_amount, start_date, status
+               coverage_amount, start_date, end_date, cash_value,
+               status, remark
         FROM insurance_products
         ORDER BY id DESC
     """, engine)
@@ -120,10 +121,18 @@ def get_financial_products():
 @app.route("/fund_products", methods=["GET"])
 def get_fund_products():
     df = pd.read_sql("""
-        SELECT id, account_id, fund_name, fund_code, currency,
-               shares, principal, status, remark
-        FROM fund_products
-        ORDER BY id DESC
+        SELECT f.id, f.account_id, f.fund_name, f.fund_code, f.currency,
+               f.shares, f.principal, f.start_date, f.end_date,
+               f.status, f.remark,
+               (
+                   SELECT fn.nav
+                   FROM fund_navs fn
+                   WHERE fn.fund_id = f.id
+                   ORDER BY fn.date DESC
+                   LIMIT 1
+               ) AS nav
+        FROM fund_products f
+        ORDER BY f.id DESC
     """, engine)
     data = df.to_dict(orient="records")
     return jsonify(serialize(data))

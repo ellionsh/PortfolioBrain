@@ -95,6 +95,8 @@ CREATE TABLE fund_products (
     currency VARCHAR(10),
     shares DECIMAL(18,4),          -- 当前份额
     principal DECIMAL(18,2),       -- 成本
+    start_date DATE,
+    end_date DATE,
     status VARCHAR(50),
     remark TEXT,
     INDEX idx_fund_code (fund_code),

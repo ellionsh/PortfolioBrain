@@ -18,36 +18,85 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<_DashboardData> _load() async {
-  final summary = await ApiClient.getSummary();
-  final accounts = await ApiClient.getAccounts();
-  final deposits = await ApiClient.getBankDeposits();
+    final summary = await ApiClient.getSummary();
+    final accounts = await ApiClient.getAccounts();
+    final deposits = await ApiClient.getBankDeposits();
+    final financialProducts = await ApiClient.getFinancialProducts();
+    final insuranceProducts = await ApiClient.getInsurance();
+    final fundProducts = await ApiClient.getFundProducts();
 
-  // account_id → account_name 映射
-  final Map<int, String> accountNames = {};
-  for (final row in accounts) {
-    final m = row as Map<String, dynamic>;
-    final id = (m['id'] as num).toInt();
-    final name = m['name'] as String? ?? '未命名账户';
-    accountNames[id] = name;
+    final Map<int, String> accountNames = {};
+    for (final row in accounts) {
+      final m = row as Map<String, dynamic>;
+      final id = (m['id'] as num).toInt();
+      final name = m['name'] as String? ?? '未命名账户';
+      accountNames[id] = name;
+    }
+
+    final Map<int, _AccountAssetBreakdown> byAccount = {};
+
+    void addAsset(int? accountId, double amount, _AssetKind kind) {
+      if (accountId == null || amount == 0) return;
+      final breakdown = byAccount.putIfAbsent(
+        accountId,
+        () => _AccountAssetBreakdown(),
+      );
+      breakdown.add(kind, amount);
+    }
+
+    for (final row in deposits) {
+      final m = row as Map<String, dynamic>;
+      addAsset(
+        (m['account_id'] as num?)?.toInt(),
+        (m['principal'] as num?)?.toDouble() ?? 0,
+        _AssetKind.deposit,
+      );
+    }
+
+    for (final row in financialProducts) {
+      final m = row as Map<String, dynamic>;
+      final principal = (m['principal'] as num?)?.toDouble() ?? 0;
+      final shares = (m['shares'] as num?)?.toDouble() ?? 0;
+      final nav = (m['nav'] as num?)?.toDouble();
+      final amount = nav == null ? principal : shares * nav;
+      addAsset(
+        (m['account_id'] as num?)?.toInt(),
+        amount,
+        _AssetKind.financial,
+      );
+    }
+
+    for (final row in insuranceProducts) {
+      final m = row as Map<String, dynamic>;
+      final cashValue = (m['cash_value'] as num?)?.toDouble();
+      final premium = (m['premium'] as num?)?.toDouble() ?? 0;
+      addAsset(
+        (m['account_id'] as num?)?.toInt(),
+        cashValue ?? premium,
+        _AssetKind.insurance,
+      );
+    }
+
+    for (final row in fundProducts) {
+      final m = row as Map<String, dynamic>;
+      final principal = (m['principal'] as num?)?.toDouble() ?? 0;
+      final shares = (m['shares'] as num?)?.toDouble() ?? 0;
+      final nav = (m['nav'] as num?)?.toDouble();
+      final amount = nav == null ? principal : shares * nav;
+      addAsset(
+        (m['account_id'] as num?)?.toInt(),
+        amount,
+        _AssetKind.fund,
+      );
+    }
+
+    return _DashboardData(
+      totalAssets: (summary['total_assets'] as num?)?.toDouble() ?? 0,
+      future6mCf: (summary['future_6m_cf'] as num?)?.toDouble() ?? 0,
+      assetsByAccount: byAccount,
+      accountNames: accountNames,
+    );
   }
-
-  // 按账户聚合本金
-  final Map<int, double> byAccount = {};
-  for (final row in deposits) {
-    final m = row as Map<String, dynamic>;
-    final id = (m['account_id'] as num?)?.toInt();
-    final principal = (m['principal'] as num?)?.toDouble() ?? 0;
-    if (id == null) continue;
-    byAccount[id] = (byAccount[id] ?? 0) + principal;
-  }
-
-  return _DashboardData(
-    totalAssets: (summary['total_assets'] as num?)?.toDouble() ?? 0,
-    future6mCf: (summary['future_6m_cf'] as num?)?.toDouble() ?? 0,
-    assetsByAccount: byAccount,
-    accountNames: accountNames,
-  );
-}
 
 
   @override
@@ -140,40 +189,44 @@ class _HomePageState extends State<HomePage> {
       ],
     );
   }
-Widget _buildDistributionList(_DashboardData d) {
-  if (d.assetsByAccount.isEmpty) {
-    return const Text('暂无银行存款数据');
-  }
+  Widget _buildDistributionList(_DashboardData d) {
+    if (d.assetsByAccount.isEmpty) {
+      return const Text('暂无资产数据');
+    }
 
-  final total = d.assetsByAccount.values.fold<double>(0, (a, b) => a + b);
-  final entries = d.assetsByAccount.entries.toList()
-    ..sort((a, b) => b.value.compareTo(a.value));
+    final total = d.assetsByAccount.values.fold<double>(
+      0,
+      (sum, item) => sum + item.total,
+    );
+    final entries = d.assetsByAccount.entries.toList()
+      ..sort((a, b) => b.value.total.compareTo(a.value.total));
 
-  return Column(
-    children: entries.map((e) {
-      final accountId = e.key;
-      final accountName = d.accountNames[accountId] ?? '账户 $accountId';
-      final ratio = total == 0 ? 0.0 : (e.value / total).toDouble();
+    return Column(
+      children: entries.map((e) {
+        final accountId = e.key;
+        final breakdown = e.value;
+        final accountName = d.accountNames[accountId] ?? '账户 $accountId';
+        final ratio = total == 0 ? 0.0 : breakdown.total / total;
 
-      return ListTile(
-        leading: CircleAvatar(
-          child: Text(accountName.substring(0, 1)),
-        ),
-        title: Text(accountName),
-        subtitle: Text(
-          '本金: ${e.value.toStringAsFixed(2)} · 占比 ${(ratio * 100).toStringAsFixed(1)}%',
-        ),
-        trailing: SizedBox(
-          width: 120,
-          child: LinearProgressIndicator(
-            value: ratio,   // ratio 已经是 double
-            minHeight: 6,
+        return ListTile(
+          leading: CircleAvatar(
+            child: Text(accountName.substring(0, 1)),
           ),
-        ),
-      );
-    }).toList(),
-  );
-}
+          title: Text(accountName),
+          subtitle: Text(
+            '资产: ${breakdown.total.toStringAsFixed(2)} · 占比 ${(ratio * 100).toStringAsFixed(1)}%\n${breakdown.summaryText}',
+          ),
+          trailing: SizedBox(
+            width: 120,
+            child: LinearProgressIndicator(
+              value: ratio,
+              minHeight: 6,
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
 
 
 }
@@ -181,7 +234,7 @@ Widget _buildDistributionList(_DashboardData d) {
 class _DashboardData {
   final double totalAssets;
   final double future6mCf;
-  final Map<int, double> assetsByAccount;
+  final Map<int, _AccountAssetBreakdown> assetsByAccount;
   final Map<int, String> accountNames;
 
   _DashboardData({
@@ -190,5 +243,47 @@ class _DashboardData {
     required this.assetsByAccount,
     required this.accountNames,
   });
+}
+
+enum _AssetKind {
+  deposit,
+  financial,
+  insurance,
+  fund,
+}
+
+class _AccountAssetBreakdown {
+  double deposit = 0;
+  double financial = 0;
+  double insurance = 0;
+  double fund = 0;
+
+  double get total => deposit + financial + insurance + fund;
+
+  void add(_AssetKind kind, double amount) {
+    switch (kind) {
+      case _AssetKind.deposit:
+        deposit += amount;
+        break;
+      case _AssetKind.financial:
+        financial += amount;
+        break;
+      case _AssetKind.insurance:
+        insurance += amount;
+        break;
+      case _AssetKind.fund:
+        fund += amount;
+        break;
+    }
+  }
+
+  String get summaryText {
+    final parts = <String>[];
+    if (deposit != 0) parts.add('存款 ${deposit.toStringAsFixed(2)}');
+    if (financial != 0) parts.add('理财 ${financial.toStringAsFixed(2)}');
+    if (insurance != 0) parts.add('保险 ${insurance.toStringAsFixed(2)}');
+    if (fund != 0) parts.add('基金 ${fund.toStringAsFixed(2)}');
+    return parts.join(' · ');
+  }
 }
 

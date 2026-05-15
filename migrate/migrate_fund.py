@@ -13,6 +13,8 @@ def migrate_fund_products(engine, path):
     df["status"] = "active"
     df["shares"] = df.get("shares", 0)
     df["principal"] = df.get("principal", 0)
+    df["start_date"] = df.get("start_date", None)
+    df["end_date"] = df.get("end_date", None)
 
     required_cols = [
         "account_id",
@@ -21,6 +23,8 @@ def migrate_fund_products(engine, path):
         "currency",
         "shares",
         "principal",
+        "start_date",
+        "end_date",
         "status",
         "remark"
     ]
