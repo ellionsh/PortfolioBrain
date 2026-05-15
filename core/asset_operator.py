@@ -356,6 +356,8 @@ class AssetOperator:
         risk_level=None,
         min_redeem_unit=None,
         principal=None,
+        shares=None,
+        nav=None,
         expected_yield=None,
         start_date=None,
         end_date=None,
@@ -367,11 +369,13 @@ class AssetOperator:
             INSERT INTO financial_products (
                 account_id, product_name, product_code, type, currency,
                 is_nav_based, risk_level, min_redeem_unit, principal,
-                expected_yield, start_date, end_date, pay_freq, status, remark
+                shares, expected_yield, start_date, end_date, pay_freq,
+                status, remark
             ) VALUES (
                 :account_id, :product_name, :product_code, :type, :currency,
                 :is_nav_based, :risk_level, :min_redeem_unit, :principal,
-                :expected_yield, :start_date, :end_date, :pay_freq, :status, :remark
+                :shares, :expected_yield, :start_date, :end_date, :pay_freq,
+                :status, :remark
             )
         """), {
             "account_id": account_id,
@@ -383,6 +387,7 @@ class AssetOperator:
             "risk_level": risk_level,
             "min_redeem_unit": min_redeem_unit,
             "principal": principal,
+            "shares": shares,
             "expected_yield": expected_yield,
             "start_date": start_date,
             "end_date": end_date,
@@ -390,15 +395,32 @@ class AssetOperator:
             "status": status,
             "remark": remark,
         })
+        product_id = self.session.execute(text("SELECT LAST_INSERT_ID()")).scalar()
+        if nav is not None:
+            self.session.execute(text("""
+                INSERT INTO financial_navs (product_id, date, nav, currency)
+                VALUES (:product_id, CURDATE(), :nav, :currency)
+                ON DUPLICATE KEY UPDATE nav=:nav
+            """), {
+                "product_id": product_id,
+                "nav": nav,
+                "currency": currency,
+            })
         self.session.commit()
-        return {"status": "success", "message": f"理财产品 {product_name} 已创建"}
+        return {
+            "status": "success",
+            "id": product_id,
+            "message": f"理财产品 {product_name} 已创建",
+        }
 
     def update_financial_product(self, id, **kwargs):
+        nav = kwargs.pop("nav", None)
+        currency = kwargs.get("currency", "CNY")
         fields = []
         params = {"id": id}
         allowed_fields = [
             "account_id", "product_name", "product_code", "type", "currency",
-            "is_nav_based", "risk_level", "min_redeem_unit", "principal",
+            "is_nav_based", "risk_level", "min_redeem_unit", "principal", "shares",
             "expected_yield", "start_date", "end_date", "pay_freq", "status", "remark"
         ]
         for key in allowed_fields:
@@ -406,9 +428,21 @@ class AssetOperator:
                 fields.append(f"{key} = :{key}")
                 params[key] = kwargs[key]
         if not fields:
-            return {"error": "没有需要更新的字段"}
-        sql = f"UPDATE financial_products SET {', '.join(fields)} WHERE id=:id"
-        self.session.execute(text(sql), params)
+            if nav is None:
+                return {"error": "没有需要更新的字段"}
+        else:
+            sql = f"UPDATE financial_products SET {', '.join(fields)} WHERE id=:id"
+            self.session.execute(text(sql), params)
+        if nav is not None:
+            self.session.execute(text("""
+                INSERT INTO financial_navs (product_id, date, nav, currency)
+                VALUES (:id, CURDATE(), :nav, :currency)
+                ON DUPLICATE KEY UPDATE nav=:nav
+            """), {
+                "id": id,
+                "nav": nav,
+                "currency": currency,
+            })
         self.session.commit()
         return {"status": "success", "message": f"理财产品 {id} 已更新"}
 

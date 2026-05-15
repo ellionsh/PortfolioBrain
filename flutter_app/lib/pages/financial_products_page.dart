@@ -26,21 +26,36 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
   Future<void> _showProductDialog({Map<String, dynamic>? product}) async {
     final accounts = await ApiClient.getAccounts();
     if (!mounted) return;
-    final accountChoices = accounts
-        .cast<Map<String, dynamic>>()
-        .map((m) => MapEntry((m['id'] as num).toInt(), m['name'] as String? ?? ''))
-        .toList();
+    final accountChoices = accounts.cast<Map<String, dynamic>>().map((m) {
+      return MapEntry((m['id'] as num).toInt(), m['name'] as String? ?? '');
+    }).toList();
 
-    int? selectedAccountId = product != null ? (product['account_id'] as num?)?.toInt() : null;
-    final nameController = TextEditingController(text: product?['product_name'] ?? '');
-    final codeController = TextEditingController(text: product?['product_code'] ?? '');
+    int? selectedAccountId =
+        product != null ? (product['account_id'] as num?)?.toInt() : null;
+    final nameController =
+        TextEditingController(text: product?['product_name'] ?? '');
+    final codeController =
+        TextEditingController(text: product?['product_code'] ?? '');
     final typeController = TextEditingController(text: product?['type'] ?? '');
-    final currencyController = TextEditingController(text: product?['currency'] ?? 'CNY');
-    bool isNavBased = product != null ? (product['is_nav_based'] == 1 || product['is_nav_based'] == true) : true;
-    final riskController = TextEditingController(text: product?['risk_level']?.toString() ?? '');
-    final minRedeemController = TextEditingController(text: product?['min_redeem_unit']?.toString() ?? '');
-    final principalController = TextEditingController(text: product?['principal']?.toString() ?? '');
-    final expectedYieldController = TextEditingController(text: product?['expected_yield']?.toString() ?? '');
+    final currencyController =
+        TextEditingController(text: product?['currency'] ?? 'CNY');
+    bool isNavBased = product != null
+        ? (product['is_nav_based'] == 1 || product['is_nav_based'] == true)
+        : true;
+    final riskController =
+        TextEditingController(text: product?['risk_level']?.toString() ?? '');
+    final minRedeemController = TextEditingController(
+      text: product?['min_redeem_unit']?.toString() ?? '',
+    );
+    final principalController =
+        TextEditingController(text: product?['principal']?.toString() ?? '');
+    final navController =
+        TextEditingController(text: product?['nav']?.toString() ?? '');
+    final sharesController =
+        TextEditingController(text: product?['shares']?.toString() ?? '');
+    final expectedYieldController = TextEditingController(
+      text: product?['expected_yield']?.toString() ?? '',
+    );
     final startController = TextEditingController(text: product?['start_date'] ?? '');
     final endController = TextEditingController(text: product?['end_date'] ?? '');
     final payFreqController = TextEditingController(text: product?['pay_freq'] ?? '');
@@ -105,6 +120,16 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
                   decoration: const InputDecoration(labelText: '本金'),
                 ),
                 TextField(
+                  controller: navController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: '净值'),
+                ),
+                TextField(
+                  controller: sharesController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: '份额'),
+                ),
+                TextField(
                   controller: expectedYieldController,
                   keyboardType: TextInputType.number,
                   decoration: const InputDecoration(labelText: '预期收益'),
@@ -139,8 +164,11 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
             ),
             ElevatedButton(
               onPressed: () async {
-                if (selectedAccountId == null || nameController.text.trim().isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('请填写产品名称和所属账户')));
+                if (selectedAccountId == null ||
+                    nameController.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('请填写产品名称和所属账户')),
+                  );
                   return;
                 }
 
@@ -149,20 +177,28 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
                   'product_name': nameController.text.trim(),
                   'product_code': codeController.text.trim(),
                   'type': typeController.text.trim(),
-                  'currency': currencyController.text.trim().isEmpty ? 'CNY' : currencyController.text.trim(),
+                  'currency': currencyController.text.trim().isEmpty
+                      ? 'CNY'
+                      : currencyController.text.trim(),
                   'is_nav_based': isNavBased,
                   'risk_level': int.tryParse(riskController.text),
                   'min_redeem_unit': double.tryParse(minRedeemController.text),
                   'principal': double.tryParse(principalController.text),
-                  'expected_yield': double.tryParse(expectedYieldController.text),
+                  'nav': double.tryParse(navController.text),
+                  'shares': double.tryParse(sharesController.text),
+                  'expected_yield':
+                      double.tryParse(expectedYieldController.text),
                   'start_date': startController.text.trim(),
                   'end_date': endController.text.trim(),
                   'pay_freq': payFreqController.text.trim(),
-                  'status': statusController.text.trim().isEmpty ? 'active' : statusController.text.trim(),
+                  'status': statusController.text.trim().isEmpty
+                      ? 'active'
+                      : statusController.text.trim(),
                   'remark': remarkController.text.trim(),
                 };
 
-                final action = isNew ? 'financial_product_create' : 'financial_product_update';
+                final action =
+                    isNew ? 'financial_product_create' : 'financial_product_update';
                 if (!isNew) {
                   params['id'] = product['id'];
                 }
@@ -171,7 +207,9 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
                 final messenger = ScaffoldMessenger.of(context);
                 final navigator = Navigator.of(context);
                 if (response.containsKey('error')) {
-                  messenger.showSnackBar(SnackBar(content: Text(response['error'].toString())));
+                  messenger.showSnackBar(
+                    SnackBar(content: Text(response['error'].toString())),
+                  );
                   return;
                 }
 
@@ -208,11 +246,16 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
       return;
     }
 
-    final response = await ApiClient.operate('financial_product_delete', {'id': product['id']});
+    final response = await ApiClient.operate(
+      'financial_product_delete',
+      {'id': product['id']},
+    );
     if (!context.mounted) return;
     final messenger = ScaffoldMessenger.of(context);
     if (response.containsKey('error')) {
-      messenger.showSnackBar(SnackBar(content: Text(response['error'].toString())));
+      messenger.showSnackBar(
+        SnackBar(content: Text(response['error'].toString())),
+      );
       return;
     }
 
@@ -244,10 +287,10 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
                         style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                       ),
                     ),
-                    ElevatedButton.icon(
+                    IconButton.filled(
                       onPressed: () => _showProductDialog(),
+                      tooltip: '新增',
                       icon: const Icon(Icons.add),
-                      label: const Text('新增'),
                     ),
                   ],
                 ),
@@ -261,19 +304,21 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
                           final row = data[i] as Map<String, dynamic>;
                           return ListTile(
                             title: Text(row['product_name'] ?? '理财产品'),
-                            subtitle: Text('${row['type'] ?? ''} · ${row['product_code'] ?? ''} · 本金 ${row['principal'] ?? ''}'),
+                            subtitle: Text(
+                              '${row['type'] ?? ''} · ${row['product_code'] ?? ''} · 本金 ${row['principal'] ?? ''} · 净值 ${row['nav'] ?? ''} · 份额 ${row['shares'] ?? ''}',
+                            ),
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                ElevatedButton.icon(
+                                IconButton(
                                   icon: const Icon(Icons.edit, size: 20),
                                   onPressed: () => _showProductDialog(product: row),
-                                  label: const Text('编辑'),
+                                  tooltip: '编辑',
                                 ),
-                                ElevatedButton.icon(
+                                IconButton(
                                   icon: const Icon(Icons.delete, size: 20),
                                   onPressed: () => _deleteProduct(row),
-                                  label: const Text('删除'),
+                                  tooltip: '删除',
                                 ),
                               ],
                             ),

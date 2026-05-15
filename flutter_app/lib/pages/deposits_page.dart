@@ -185,6 +185,80 @@ class _DepositsPageState extends State<DepositsPage> {
     await _refresh();
   }
 
+  Future<void> _withdrawDeposit(Map<String, dynamic> deposit) async {
+    final principal = (deposit['principal'] as num?)?.toDouble() ?? 0;
+    final amountController = TextEditingController();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('取出存款'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text('当前本金 ¥${principal.toStringAsFixed(2)}'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: amountController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: '取出金额',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('取消'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final amount = double.tryParse(amountController.text);
+                if (amount == null || amount <= 0 || amount > principal) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('请填写有效的取出金额')),
+                  );
+                  return;
+                }
+                Navigator.of(context).pop(true);
+              },
+              child: const Text('取出'),
+            ),
+          ],
+        );
+      },
+    );
+
+    final amount = double.tryParse(amountController.text);
+    amountController.dispose();
+
+    if (confirmed != true || amount == null) {
+      return;
+    }
+
+    final response = await ApiClient.operate('bank_deposit_withdraw', {
+      'id': deposit['id'],
+      'amount': amount,
+    });
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    if (response.containsKey('error')) {
+      messenger.showSnackBar(
+        SnackBar(content: Text(response['error'].toString())),
+      );
+      return;
+    }
+
+    messenger.showSnackBar(const SnackBar(content: Text('取出成功')));
+    await _refresh();
+  }
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -211,10 +285,10 @@ class _DepositsPageState extends State<DepositsPage> {
                         style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                       ),
                     ),
-                    ElevatedButton.icon(
+                    IconButton.filled(
                       onPressed: () => _showDepositDialog(accountNames: data.accountNames),
+                      tooltip: '新增',
                       icon: const Icon(Icons.add),
-                      label: const Text('新增'),
                     ),
                   ],
                 ),
@@ -263,15 +337,20 @@ class _DepositsPageState extends State<DepositsPage> {
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  ElevatedButton.icon(
+                  IconButton(
                     icon: const Icon(Icons.edit, size: 20),
                     onPressed: () => _showDepositDialog(deposit: m, accountNames: d.accountNames),
-                    label: const Text('编辑'),
+                    tooltip: '编辑',
                   ),
-                  ElevatedButton.icon(
+                  IconButton(
+                    icon: const Icon(Icons.payments, size: 20),
+                    onPressed: () => _withdrawDeposit(m),
+                    tooltip: '取出',
+                  ),
+                  IconButton(
                     icon: const Icon(Icons.delete, size: 20),
                     onPressed: () => _deleteDeposit(m),
-                    label: const Text('删除'),
+                    tooltip: '删除',
                   ),
                 ],
               ),
