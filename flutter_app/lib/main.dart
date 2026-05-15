@@ -42,22 +42,13 @@ class _PortfolioBrainAppState extends State<PortfolioBrainApp> {
   int _index = 0;
 
   late ApiServerConfig _config;
-
-  late final List<Widget> _pages;
+  int _configVersion = 0;
 
   @override
   void initState() {
     super.initState();
 
     _config = widget.initialConfig;
-
-    _pages = [
-      const HomePage(),
-      const AccountsPage(),
-      const InvestmentsPage(),
-      const CashflowPage(),
-      const AgentChatPage(),
-    ];
   }
 
   void _applyConfig(ApiServerConfig config) {
@@ -70,6 +61,7 @@ class _PortfolioBrainAppState extends State<PortfolioBrainApp> {
     setState(() {
       _config = config;
       _index = 0;
+      _configVersion++;
     });
   }
 
@@ -88,6 +80,32 @@ class _PortfolioBrainAppState extends State<PortfolioBrainApp> {
         ),
       ),
     );
+  }
+
+  List<Widget> _buildPages() {
+    final version = _configVersion;
+    return [
+      KeyedSubtree(
+        key: ValueKey('home_$version'),
+        child: const HomePage(),
+      ),
+      KeyedSubtree(
+        key: ValueKey('accounts_$version'),
+        child: const AccountsPage(),
+      ),
+      KeyedSubtree(
+        key: ValueKey('investments_$version'),
+        child: const InvestmentsPage(),
+      ),
+      KeyedSubtree(
+        key: ValueKey('cashflow_$version'),
+        child: const CashflowPage(),
+      ),
+      KeyedSubtree(
+        key: ValueKey('agent_chat_$version'),
+        child: const AgentChatPage(),
+      ),
+    ];
   }
 
   @override
@@ -123,7 +141,7 @@ class _PortfolioBrainAppState extends State<PortfolioBrainApp> {
                   // 保持页面状态
                   body: IndexedStack(
                     index: _index,
-                    children: _pages,
+                    children: _buildPages(),
                   ),
 
                   // Material 3 NavigationBar
@@ -173,4 +191,3 @@ class _PortfolioBrainAppState extends State<PortfolioBrainApp> {
     );
   }
 }
-
