@@ -1,18 +1,28 @@
 import 'package:flutter/material.dart';
+import 'api/api_client.dart';
+import 'api/api_server_config.dart';
 import 'pages/home_page.dart';
 import 'pages/accounts_page.dart';
-import 'pages/deposits_page.dart';
 import 'pages/cashflow_page.dart';
-import 'pages/insurance_page.dart';
-import 'pages/financial_products_page.dart';
+import 'pages/investments_page.dart';
 import 'pages/agent_chat_page.dart';
+import 'pages/server_config_page.dart';
 
-void main() {
-  runApp(const PortfolioBrainApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final config = await ApiServerConfig.load();
+  ApiClient.configure(
+    host: config.host,
+    port: config.port,
+    scheme: config.scheme,
+  );
+  runApp(PortfolioBrainApp(initialConfig: config));
 }
 
 class PortfolioBrainApp extends StatefulWidget {
-  const PortfolioBrainApp({super.key});
+  final ApiServerConfig initialConfig;
+
+  const PortfolioBrainApp({super.key, required this.initialConfig});
 
   @override
   State<PortfolioBrainApp> createState() => _PortfolioBrainAppState();
@@ -20,16 +30,50 @@ class PortfolioBrainApp extends StatefulWidget {
 
 class _PortfolioBrainAppState extends State<PortfolioBrainApp> {
   int _index = 0;
+  int _configVersion = 0;
+  late ApiServerConfig _config;
 
   final _pages = const [
     HomePage(),
     AccountsPage(),
-    DepositsPage(),
-    InsurancePage(),
-    FinancialProductsPage(),
+    InvestmentsPage(),
     CashflowPage(),
     AgentChatPage(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _config = widget.initialConfig;
+  }
+
+  void _applyConfig(ApiServerConfig config) {
+    ApiClient.configure(
+      host: config.host,
+      port: config.port,
+      scheme: config.scheme,
+    );
+    setState(() {
+      _config = config;
+      _configVersion++;
+      _index = 0;
+    });
+  }
+
+  Future<void> _openServerConfig() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) => ServerConfigPage(
+          initialConfig: _config,
+          canCancel: true,
+          onSaved: (config) {
+            _applyConfig(config);
+            Navigator.of(context).pop();
+          },
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -39,23 +83,59 @@ class _PortfolioBrainAppState extends State<PortfolioBrainApp> {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
         useMaterial3: true,
       ),
-      home: Scaffold(
-        body: _pages[_index],
-        bottomNavigationBar: BottomNavigationBar(
-          currentIndex: _index,
-          type: BottomNavigationBarType.fixed,
-          onTap: (i) => setState(() => _index = i),
-          items: const [
-            BottomNavigationBarItem(icon: Icon(Icons.home), label: '首页'),
-            BottomNavigationBarItem(icon: Icon(Icons.account_balance_wallet), label: '账户'),
-            BottomNavigationBarItem(icon: Icon(Icons.savings), label: '存款'),
-            BottomNavigationBarItem(icon: Icon(Icons.health_and_safety), label: '保险'),
-            BottomNavigationBarItem(icon: Icon(Icons.show_chart), label: '理财'),
-            BottomNavigationBarItem(icon: Icon(Icons.receipt_long), label: '现金流'),
-            BottomNavigationBarItem(icon: Icon(Icons.smart_toy), label: '助手'),
-          ],
-        ),
-      ),
+      home: _config.isConfigured
+          ? Scaffold(
+              body: Stack(
+                children: [
+                  KeyedSubtree(
+                    key: ValueKey('$_configVersion-$_index'),
+                    child: _pages[_index],
+                  ),
+                  Positioned(
+                    top: 12,
+                    right: 12,
+                    child: SafeArea(
+                      child: IconButton.filledTonal(
+                        tooltip: '服务器配置',
+                        onPressed: _openServerConfig,
+                        icon: const Icon(Icons.settings_ethernet),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              bottomNavigationBar: BottomNavigationBar(
+                currentIndex: _index,
+                type: BottomNavigationBarType.fixed,
+                onTap: (i) => setState(() => _index = i),
+                items: const [
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.home),
+                    label: '首页',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.account_balance_wallet),
+                    label: '账户',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.inventory_2),
+                    label: '资产',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.receipt_long),
+                    label: '现金流',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.smart_toy),
+                    label: '助手',
+                  ),
+                ],
+              ),
+            )
+          : ServerConfigPage(
+              initialConfig: _config,
+              onSaved: _applyConfig,
+            ),
     );
   }
 }

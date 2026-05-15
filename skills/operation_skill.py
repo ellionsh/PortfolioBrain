@@ -93,6 +93,21 @@ class OperationSkill:
             return self.op.delete_financial_product(**params)
 
         # ============================
+        # 5. 基金（Fund）
+        # ============================
+        elif action == "fund_product_create":
+            return self.op.create_fund_product(**params)
+
+        elif action == "fund_product_update":
+            return self.op.update_fund_product(**params)
+
+        elif action == "fund_product_delete":
+            return self.op.delete_fund_product(**params)
+
+        elif action == "fund_update_nav":
+            return self.op.update_fund_nav(**params)
+
+        # ============================
         # 未知操作
         # ============================
         else:

@@ -46,6 +46,7 @@ def index():
             "/positions",
             "/cashflows",
             "/products",
+            "/fund_products",
             "/nav/<id>",
             "/operate"
         ]
@@ -107,6 +108,17 @@ def get_financial_products():
     data = df.to_dict(orient="records")
     return jsonify(serialize(data))
 
+@app.route("/fund_products", methods=["GET"])
+def get_fund_products():
+    df = pd.read_sql("""
+        SELECT id, account_id, fund_name, fund_code, currency,
+               shares, principal, status, remark
+        FROM fund_products
+        ORDER BY id DESC
+    """, engine)
+    data = df.to_dict(orient="records")
+    return jsonify(serialize(data))
+
 @app.route("/financial_transactions", methods=["GET"])
 def get_financial_transactions():
     df = pd.read_sql("""
@@ -133,45 +145,35 @@ def chat():
 # ============================
 @app.route("/summary", methods=["GET"])
 def summary():
-    # 银行存款本金
-    df_bank = pd.read_sql("""
-        SELECT SUM(principal) AS v 
-        FROM bank_deposits 
-        WHERE status='active'
-    """, engine)
-    bank_value = float(df_bank["v"][0] or 0)
+    # 从视图中直接获取各类资产和总资产
+    df_summary = pd.read_sql("SELECT * FROM asset_summary_view", engine)
 
-    # 理财产品本金
-    df_fp = pd.read_sql("""
-        SELECT SUM(principal) AS v 
-        FROM financial_products 
-        WHERE status='active'
-    """, engine)
-    fp_value = float(df_fp["v"][0] or 0)
+    # 取出结果
+    bank_value = float(df_summary["bank_assets"][0] or 0)
+    financial_value = float(df_summary["financial_assets"][0] or 0)
+    fund_value = float(df_summary["fund_assets"][0] or 0)
+    insurance_value = float(df_summary["insurance_assets"][0] or 0)
+    total_assets = float(df_summary["total_assets"][0] or 0)
 
-    # 保险现金价值
-    df_ins = pd.read_sql("""
-        SELECT SUM(cash_value) AS v 
-        FROM insurance_products 
-        WHERE status='active'
-    """, engine)
-    ins_value = float(df_ins["v"][0] or 0)
-
-    # 未来6个月现金流
+    # 未来6个月现金流仍然单独查询
     df_cf = pd.read_sql("""
-        SELECT SUM(amount) AS v FROM cashflows
+        SELECT COALESCE(SUM(amount),0) AS v 
+        FROM cashflows
         WHERE date >= CURDATE()
         AND date < DATE_ADD(CURDATE(), INTERVAL 180 DAY)
     """, engine)
     future_6m_cf = float(df_cf["v"][0] or 0)
 
     return {
-        "total_assets": bank_value + fp_value + ins_value,
+        "total_assets": total_assets,
         "bank_assets": bank_value,
-        "financial_products": fp_value,
-        "insurance_assets": ins_value,
+        "financial_assets": financial_value,
+        "fund_assets": fund_value,
+        "insurance_assets": insurance_value,
         "future_6m_cf": future_6m_cf
     }
+
+
 
 
 # ============================

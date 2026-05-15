@@ -1,5 +1,5 @@
 -- ============================================
--- PortfolioBrain MySQL Schema (12 Tables)
+-- PortfolioBrain MySQL Schema (15 Tables + 1 View)
 -- ============================================
 
 CREATE DATABASE IF NOT EXISTS portfolio
@@ -7,7 +7,6 @@ CREATE DATABASE IF NOT EXISTS portfolio
   DEFAULT COLLATE utf8mb4_unicode_ci;
 
 USE portfolio;
-
 
 -- 1. accounts（账户表）
 CREATE TABLE accounts (
@@ -19,7 +18,6 @@ CREATE TABLE accounts (
     created_at DATE,
     INDEX idx_accounts_type (type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
 
 -- 2. bank_deposits（银行存款）
 CREATE TABLE bank_deposits (
@@ -40,7 +38,6 @@ CREATE TABLE bank_deposits (
     INDEX idx_bank_deposits_end_date (end_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-
 -- 3. financial_products（理财产品主数据）
 CREATE TABLE financial_products (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -52,7 +49,8 @@ CREATE TABLE financial_products (
     is_nav_based BOOLEAN,
     risk_level INT,
     min_redeem_unit DECIMAL(18,4),
-    principal DECIMAL(18,2),
+    principal DECIMAL(18,2),       -- 成本
+    shares DECIMAL(18,4),          -- 当前份额
     expected_yield DECIMAL(10,4),
     start_date DATE,
     end_date DATE,
@@ -62,7 +60,6 @@ CREATE TABLE financial_products (
     INDEX idx_fin_products_code (product_code),
     INDEX idx_fin_products_account (account_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
 
 -- 4. financial_transactions（理财交易记录）
 CREATE TABLE financial_transactions (
@@ -80,7 +77,6 @@ CREATE TABLE financial_transactions (
     INDEX idx_fin_tx_date (trade_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-
 -- 5. financial_navs（理财净值）
 CREATE TABLE financial_navs (
     product_id INT,
@@ -90,8 +86,47 @@ CREATE TABLE financial_navs (
     PRIMARY KEY (product_id, date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- 6. fund_products（基金主数据）
+CREATE TABLE fund_products (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    account_id INT,
+    fund_name VARCHAR(255),
+    fund_code VARCHAR(100),
+    currency VARCHAR(10),
+    shares DECIMAL(18,4),          -- 当前份额
+    principal DECIMAL(18,2),       -- 成本
+    status VARCHAR(50),
+    remark TEXT,
+    INDEX idx_fund_code (fund_code),
+    INDEX idx_fund_account (account_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 6. insurance_products（保险产品）
+-- 7. fund_transactions（基金交易记录）
+CREATE TABLE fund_transactions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    fund_id INT,
+    account_id INT,
+    trade_date DATE,
+    trade_type VARCHAR(50),        -- buy/sell/dividend/fee
+    shares DECIMAL(18,4),
+    amount DECIMAL(18,2),
+    nav DECIMAL(18,4),
+    fee DECIMAL(18,2),
+    currency VARCHAR(10),
+    INDEX idx_fund_tx_date (trade_date),
+    INDEX idx_fund_tx_fund (fund_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 8. fund_navs（基金净值）
+CREATE TABLE fund_navs (
+    fund_id INT,
+    date DATE,
+    nav DECIMAL(18,4),
+    currency VARCHAR(10),
+    PRIMARY KEY (fund_id, date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 9. insurance_products（保险产品）
 CREATE TABLE insurance_products (
     id INT AUTO_INCREMENT PRIMARY KEY,
     account_id INT,
@@ -111,11 +146,10 @@ CREATE TABLE insurance_products (
     INDEX idx_insurance_account (account_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-
--- 7. cashflows（现金流）
+-- 10. cashflows（现金流）
 CREATE TABLE cashflows (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    source_type VARCHAR(50),   -- financial/insurance/bank
+    source_type VARCHAR(50),   -- financial/insurance/bank/fund
     source_id INT,
     account_id INT,
     date DATE,
@@ -127,8 +161,7 @@ CREATE TABLE cashflows (
     INDEX idx_cashflows_account (account_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-
--- 8. assets（资产主数据）
+-- 11. assets（资产主数据）
 CREATE TABLE assets (
     code VARCHAR(100) PRIMARY KEY,
     name VARCHAR(255),
@@ -140,8 +173,7 @@ CREATE TABLE assets (
     INDEX idx_assets_type (type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-
--- 9. positions（每日持仓快照）
+-- 12. positions（每日持仓快照）
 CREATE TABLE positions (
     id INT AUTO_INCREMENT PRIMARY KEY,
     date DATE,
@@ -157,8 +189,7 @@ CREATE TABLE positions (
     INDEX idx_positions_asset (asset_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-
--- 10. transactions（通用交易记录）
+-- 13. transactions（通用交易记录）
 CREATE TABLE transactions (
     id INT AUTO_INCREMENT PRIMARY KEY,
     account_id INT,
@@ -174,8 +205,7 @@ CREATE TABLE transactions (
     INDEX idx_tx_asset (asset_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-
--- 11. prices（历史价格）
+-- 14. prices（历史价格）
 CREATE TABLE prices (
     asset_code VARCHAR(100),
     date DATE,
@@ -184,8 +214,7 @@ CREATE TABLE prices (
     PRIMARY KEY (asset_code, date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-
--- 12. fx_rates（汇率）
+-- 15. fx_rates（汇率）
 CREATE TABLE fx_rates (
     date DATE,
     base_currency VARCHAR(10),
@@ -195,5 +224,82 @@ CREATE TABLE fx_rates (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ============================================
--- END OF SCHEMA
+-- 视图：资产总览
 -- ============================================
+CREATE OR REPLACE VIEW asset_summary_view AS
+SELECT
+    -- 银行存款本金
+    (SELECT COALESCE(SUM(principal),0) 
+     FROM bank_deposits 
+     WHERE status='active') AS bank_assets,
+
+    -- 理财产品市值（份额 × 最新净值）
+    (SELECT COALESCE(SUM(fp.shares * fn.nav),0)
+     FROM financial_products fp
+     JOIN (
+         SELECT product_id, MAX(date) AS latest_date
+         FROM financial_navs
+         GROUP BY product_id
+     ) latest ON fp.id = latest.product_id
+     JOIN financial_navs fn 
+       ON fn.product_id = latest.product_id AND fn.date = latest.latest_date
+     WHERE fp.status='active') AS financial_assets,
+
+    -- 基金市值（份额 × 最新净值）
+    (SELECT COALESCE(SUM(f.shares * fn.nav),0)
+     FROM fund_products f
+     JOIN (
+         SELECT fund_id, MAX(date) AS latest_date
+         FROM fund_navs
+         GROUP BY fund_id
+     ) latest ON f.id = latest.fund_id
+     JOIN fund_navs fn 
+       ON fn.fund_id = latest.fund_id AND fn.date = latest.latest_date
+     WHERE f.status='active') AS fund_assets,
+
+    -- 保险现金价值
+    (SELECT COALESCE(SUM(cash_value),0) 
+     FROM insurance_products 
+     WHERE status='active') AS insurance_assets,
+
+    -- 总资产
+    (
+      (SELECT COALESCE(SUM(principal),0) FROM bank_deposits WHERE status='active')
+      +
+      (SELECT COALESCE(SUM(fp.shares * fn.nav),0)
+       FROM financial_products fp
+       JOIN (
+           SELECT product_id, MAX(date) AS latest_date
+           FROM financial_navs
+           GROUP BY product_id
+       ) latest ON fp.id = latest.product_id
+       JOIN financial_navs fn 
+         ON fn.product_id = latest.product_id AND fn.date = latest.latest_date
+       WHERE fp.status='active')
+      +
+      (SELECT COALESCE(SUM(f.shares * fn.nav),0)
+       FROM fund_products f
+       JOIN (
+           SELECT fund_id, MAX(date) AS latest_date
+           FROM fund_navs
+           GROUP BY fund_id
+       ) latest ON f.id = latest.fund_id
+       JOIN fund_navs fn 
+         ON fn.fund_id = latest.fund_id AND fn.date = latest.latest_date
+       WHERE f.status='active')
+      +
+      (SELECT COALESCE(SUM(cash_value),0) FROM insurance_products WHERE status='active')
+    ) AS total_assets;
+
+
+CREATE TABLE migration_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    file_name VARCHAR(255),
+    table_name VARCHAR(255),
+    rows INT,
+    status VARCHAR(50),
+    message TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+

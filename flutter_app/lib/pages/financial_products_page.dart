@@ -36,7 +36,7 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
     final codeController = TextEditingController(text: product?['product_code'] ?? '');
     final typeController = TextEditingController(text: product?['type'] ?? '');
     final currencyController = TextEditingController(text: product?['currency'] ?? 'CNY');
-    bool isNavBased = product != null ? (product['is_nav_based'] == 1 || product['is_nav_based'] == true) : false;
+    bool isNavBased = product != null ? (product['is_nav_based'] == 1 || product['is_nav_based'] == true) : true;
     final riskController = TextEditingController(text: product?['risk_level']?.toString() ?? '');
     final minRedeemController = TextEditingController(text: product?['min_redeem_unit']?.toString() ?? '');
     final principalController = TextEditingController(text: product?['principal']?.toString() ?? '');

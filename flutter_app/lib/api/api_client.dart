@@ -2,7 +2,18 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class ApiClient {
-  static const String baseUrl = 'http://192.168.71.31:5000';
+  static String _baseUrl = 'http://192.168.71.31:5000';
+
+  static String get baseUrl => _baseUrl;
+
+  static void configure({
+    required String host,
+    required int port,
+    String scheme = 'http',
+  }) {
+    final normalizedHost = host.trim().replaceAll(RegExp(r'^https?://'), '');
+    _baseUrl = '$scheme://$normalizedHost:$port';
+  }
 
   static Future<String> chat(String query) async {
     final resp = await http.post(
@@ -60,6 +71,15 @@ class ApiClient {
       return jsonDecode(resp.body) as List<dynamic>;
     } else {
       throw Exception('Financial products API error');
+    }
+  }
+
+  static Future<List<dynamic>> getFundProducts() async {
+    final resp = await http.get(Uri.parse('$baseUrl/fund_products'));
+    if (resp.statusCode == 200) {
+      return jsonDecode(resp.body) as List<dynamic>;
+    } else {
+      throw Exception('Fund products API error');
     }
   }
 

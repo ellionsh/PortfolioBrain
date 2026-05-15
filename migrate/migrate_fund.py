@@ -1,39 +1,30 @@
-# migrate/migrate_financial.py
+# migrate/migrate_fund.py
 import pandas as pd
 from migrate.mapping import normalize_columns
 
 # ============================================
-# 迁移 financial_products（理财产品主数据）
+# 迁移 fund_products（基金主数据）
 # ============================================
-def migrate_financial_products(engine, path):
+def migrate_fund_products(engine, path):
     df = pd.read_excel(path)
     df = normalize_columns(df)
 
-    # 默认值处理
-    df["type"] = df.get("type", "nav")
     df["currency"] = df.get("currency", "CNY")
-    df["is_nav_based"] = df["type"].apply(lambda x: 1 if x == "nav" else 0)
     df["status"] = "active"
-
-    # shares 字段（新增）
     df["shares"] = df.get("shares", 0)
+    df["principal"] = df.get("principal", 0)
 
     required_cols = [
         "account_id",
-        "product_name",
-        "product_code",
-        "type",
+        "fund_name",
+        "fund_code",
         "currency",
-        "is_nav_based",
+        "shares",
         "principal",
-        "shares",              # 新增字段
-        "expected_yield",
-        "start_date",
-        "end_date",
-        "status"
+        "status",
+        "remark"
     ]
 
-    # 缺失字段补齐
     for col in required_cols:
         if col not in df.columns:
             df[col] = None
@@ -41,7 +32,7 @@ def migrate_financial_products(engine, path):
     df = df[required_cols]
 
     df.to_sql(
-        "financial_products",
+        "fund_products",
         engine,
         if_exists="append",
         index=False
@@ -51,21 +42,54 @@ def migrate_financial_products(engine, path):
 
 
 # ============================================
-# 迁移 financial_transactions（理财交易记录）
+# 迁移 fund_transactions（基金交易记录）
 # ============================================
-def migrate_financial_transactions(engine, path):
+def migrate_fund_transactions(engine, path):
     df = pd.read_excel(path)
     df = normalize_columns(df)
 
     df["currency"] = df.get("currency", "CNY")
 
     required_cols = [
-        "product_id",
+        "fund_id",
         "account_id",
         "trade_date",
         "trade_type",
         "shares",
         "amount",
+        "nav",
+        "fee",
+        "currency"
+    ]
+
+    for col in required_cols:
+        if col not in df.columns:
+            df[col] = None
+
+    df = df[required_cols]
+
+    df.to_sql(
+        "fund_transactions",
+        engine,
+        if_exists="append",
+        index=False
+    )
+
+    return {"status": "success", "rows": len(df)}
+
+
+# ============================================
+# 迁移 fund_navs（基金净值）
+# ============================================
+def migrate_fund_navs(engine, path):
+    df = pd.read_excel(path)
+    df = normalize_columns(df)
+
+    df["currency"] = df.get("currency", "CNY")
+
+    required_cols = [
+        "fund_id",
+        "date",
         "nav",
         "currency"
     ]
@@ -77,7 +101,7 @@ def migrate_financial_transactions(engine, path):
     df = df[required_cols]
 
     df.to_sql(
-        "financial_transactions",
+        "fund_navs",
         engine,
         if_exists="append",
         index=False

@@ -29,6 +29,8 @@ class AssetOperator:
                 return self._buy_fixed_financial(**kwargs)
             elif asset_type == "bank_deposit":
                 return self._buy_bank_deposit(**kwargs)
+            elif asset_type == "fund":
+                return self._buy_fund(**kwargs)
             elif asset_type == "insurance":
                 return self._buy_insurance(**kwargs)
             else:
@@ -40,21 +42,20 @@ class AssetOperator:
     # --- 净值型理财买入 ---
     def _buy_nav_financial(self, product_id, account_id, amount, nav, date):
         shares = amount / nav
-
+        # 插入交易记录
         self.session.execute(text("""
             INSERT INTO financial_transactions (
                 product_id, account_id, trade_date, trade_type,
                 shares, amount, nav, currency
             ) VALUES (:pid, :aid, :date, 'buy', :shares, :amount, :nav, 'CNY')
-        """), {
-            "pid": product_id,
-            "aid": account_id,
-            "date": date,
-            "shares": shares,
-            "amount": amount,
-            "nav": nav
-        })
-
+        """), {"pid": product_id, "aid": account_id, "date": date,
+            "shares": shares, "amount": amount, "nav": nav})
+        # 更新产品份额
+        self.session.execute(text("""
+            UPDATE financial_products
+            SET shares = COALESCE(shares,0) + :shares, status='active'
+            WHERE id=:pid
+        """), {"shares": shares, "pid": product_id})
         self.session.commit()
         return {"status": "success", "shares": float(shares)}
 
@@ -128,6 +129,8 @@ class AssetOperator:
                 return self._sell_nav_financial(**kwargs)
             elif asset_type == "fixed_financial":
                 return self._sell_fixed_financial(**kwargs)
+            elif asset_type == "fund":
+                return self._sell_fund(**kwargs)
             elif asset_type == "bank_deposit":
                 return self._sell_bank_deposit(**kwargs)
             else:
@@ -139,21 +142,20 @@ class AssetOperator:
     # --- 净值型理财赎回 ---
     def _sell_nav_financial(self, product_id, account_id, shares, nav, date):
         amount = shares * nav
-
+        # 插入交易记录
         self.session.execute(text("""
             INSERT INTO financial_transactions (
                 product_id, account_id, trade_date, trade_type,
                 shares, amount, nav, currency
             ) VALUES (:pid, :aid, :date, 'sell', :shares, :amount, :nav, 'CNY')
-        """), {
-            "pid": product_id,
-            "aid": account_id,
-            "date": date,
-            "shares": shares,
-            "amount": amount,
-            "nav": nav
-        })
-
+        """), {"pid": product_id, "aid": account_id, "date": date,
+            "shares": shares, "amount": amount, "nav": nav})
+        # 更新产品份额
+        self.session.execute(text("""
+            UPDATE financial_products
+            SET shares = shares - :shares
+            WHERE id=:pid
+        """), {"shares": shares, "pid": product_id})
         self.session.commit()
         return {"status": "success", "amount": float(amount)}
 
@@ -179,6 +181,22 @@ class AssetOperator:
 
         self.session.commit()
         return {"status": "success"}
+    def _sell_fund(self, fund_id, account_id, shares, nav, date):
+        amount = shares * nav
+        self.session.execute(text("""
+            INSERT INTO fund_transactions (
+                fund_id, account_id, trade_date, trade_type,
+                shares, amount, nav, currency
+            ) VALUES (:fid, :aid, :date, 'sell', :shares, :amount, :nav, 'CNY')
+        """), {"fid": fund_id, "aid": account_id, "date": date,
+            "shares": shares, "amount": amount, "nav": nav})
+        self.session.execute(text("""
+            UPDATE fund_products
+            SET shares = shares - :shares
+            WHERE id=:fid
+        """), {"shares": shares, "fid": fund_id})
+        self.session.commit()
+        return {"status": "success", "amount": float(amount)}
 
     # --- 银行存款支取 ---
     def _sell_bank_deposit(self, id, amount, date):
@@ -211,6 +229,16 @@ class AssetOperator:
 
         self.session.commit()
         return {"status": "success"}
+    
+    def update_fund_nav(self, fund_id, date, nav):
+        self.session.execute(text("""
+            INSERT INTO fund_navs (fund_id, date, nav, currency)
+            VALUES (:fid, :date, :nav, 'CNY')
+            ON DUPLICATE KEY UPDATE nav=:nav
+        """), {"fid": fund_id, "date": date, "nav": nav})
+        self.session.commit()
+        return {"status": "success"}
+
 
     # ============================
     # 4. 更新状态
@@ -391,6 +419,42 @@ class AssetOperator:
         self.session.commit()
         return {"status": "success", "message": f"理财产品 ID={id} 已删除"}
 
+    # ============================
+    # 4. CRUD 方法（基金）
+    # ============================
+    def create_fund_product(self, account_id, fund_name, fund_code, currency="CNY",
+                            shares=0, principal=0, status="active", remark=None):
+        self.session.execute(text("""
+            INSERT INTO fund_products (
+                account_id, fund_name, fund_code, currency,
+                shares, principal, status, remark
+            ) VALUES (:aid, :name, :code, :currency, :shares, :principal, :status, :remark)
+        """), {"aid": account_id, "name": fund_name, "code": fund_code,
+               "currency": currency, "shares": shares, "principal": principal,
+               "status": status, "remark": remark})
+        self.session.commit()
+        return {"status": "success", "message": f"基金产品 {fund_name} 已创建"}
+
+    def update_fund_product(self, id, **kwargs):
+        fields, params = [], {"id": id}
+        allowed = ["account_id", "fund_name", "fund_code", "currency",
+                   "shares", "principal", "status", "remark"]
+        for key in allowed:
+            if key in kwargs:
+                fields.append(f"{key} = :{key}")
+                params[key] = kwargs[key]
+        if not fields:
+            return {"error": "没有需要更新的字段"}
+        sql = f"UPDATE fund_products SET {', '.join(fields)} WHERE id=:id"
+        self.session.execute(text(sql), params)
+        self.session.commit()
+        return {"status": "success", "message": f"基金产品 {id} 已更新"}
+
+    def delete_fund_product(self, id):
+        self.session.execute(text("DELETE FROM fund_products WHERE id=:id"), {"id": id})
+        self.session.commit()
+        return {"status": "success", "message": f"基金产品 ID={id} 已删除"}
+    
     # ============================
     # 9. 新增账户
     # ============================
