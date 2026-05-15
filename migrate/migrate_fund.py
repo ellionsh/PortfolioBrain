@@ -8,6 +8,9 @@ from migrate.mapping import normalize_columns
 def migrate_fund_products(engine, path):
     df = pd.read_excel(path)
     df = normalize_columns(df)
+    for date_col in ("start_date", "end_date"):
+        if date_col in df.columns:
+            df[date_col] = pd.to_datetime(df[date_col], errors="coerce").dt.date
 
     df["currency"] = df.get("currency", "CNY")
     df["status"] = "active"
