@@ -65,9 +65,12 @@ class AssetOperator:
         # 更新产品份额
         self.session.execute(text("""
             UPDATE financial_products
-            SET shares = COALESCE(shares,0) + :shares, status='active'
+            SET shares = COALESCE(shares,0) + :shares,
+                principal = COALESCE(principal,0) + :amount,
+                start_date = COALESCE(start_date, :date),
+                status='active'
             WHERE id=:pid
-        """), {"shares": shares, "pid": product_id})
+        """), {"shares": shares, "amount": amount, "date": date, "pid": product_id})
         self.session.commit()
         return {"status": "success", "shares": float(shares)}
 
@@ -75,7 +78,9 @@ class AssetOperator:
     def _buy_fixed_financial(self, product_id, account_id, principal, date):
         self.session.execute(text("""
             UPDATE financial_products
-            SET principal=:p, start_date=:d, status='active'
+            SET principal = COALESCE(principal,0) + :p,
+                start_date = COALESCE(start_date, :d),
+                status='active'
             WHERE id=:pid
         """), {
             "p": principal,
@@ -205,9 +210,10 @@ class AssetOperator:
         # 更新产品份额
         self.session.execute(text("""
             UPDATE financial_products
-            SET shares = shares - :shares
+            SET shares = shares - :shares,
+                principal = COALESCE(principal,0) - :amount
             WHERE id=:pid
-        """), {"shares": shares, "pid": product_id})
+        """), {"shares": shares, "amount": amount, "pid": product_id})
         self.session.commit()
         return {"status": "success", "amount": float(amount)}
 
@@ -215,9 +221,10 @@ class AssetOperator:
     def _sell_fixed_financial(self, product_id, account_id, amount, date):
         self.session.execute(text("""
             UPDATE financial_products
-            SET status='redeemed'
+            SET status='redeemed',
+                principal = COALESCE(principal,0) - :amount
             WHERE id=:pid
-        """), {"pid": product_id})
+        """), {"pid": product_id, "amount": amount})
 
         self.session.execute(text("""
             INSERT INTO cashflows (

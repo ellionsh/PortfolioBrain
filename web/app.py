@@ -113,7 +113,7 @@ def get_financial_products():
                    LIMIT 1
                ) AS nav
         FROM financial_products fp
-        ORDER BY fp.id DESC
+        ORDER BY fp.end_date IS NOT NULL, fp.end_date ASC, fp.id DESC
     """, engine)
     data = df.to_dict(orient="records")
     return jsonify(serialize(data))

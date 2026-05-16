@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../api/api_client.dart';
 
@@ -27,6 +28,33 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
     return product['is_nav_based'] == 1 ||
         product['is_nav_based'] == true ||
         product['type'] == 'nav';
+  }
+
+  double? _parseDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.toDouble();
+    return double.tryParse(value.toString());
+  }
+
+  DateTime? _parseDate(dynamic value) {
+    if (value == null) return null;
+    final text = value.toString().trim();
+    if (text.isEmpty) return null;
+    try {
+      return DateTime.parse(text);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String _formatNumber(double? value, {int fraction = 2}) {
+    if (value == null) return '';
+    return value.toStringAsFixed(fraction);
+  }
+
+  String _formatPercent(double? value, {int fraction = 2}) {
+    if (value == null) return '';
+    return '${(value * 100).toStringAsFixed(fraction)}%';
   }
 
   String _today() => DateTime.now().toIso8601String().substring(0, 10);
@@ -596,10 +624,59 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
                         itemCount: data.length,
                         itemBuilder: (context, i) {
                           final row = data[i] as Map<String, dynamic>;
+                          final shares = _parseDouble(row['shares']);
+                          final nav = _parseDouble(row['nav']);
+                          final principal = _parseDouble(row['principal']);
+                          final marketValue = (shares != null && nav != null)
+                              ? shares * nav
+                              : null;
+                          final yieldRate = (marketValue != null &&
+                                  principal != null &&
+                                  principal > 0)
+                              ? (marketValue - principal) / principal
+                              : null;
+                          final startDate = _parseDate(row['start_date']);
+                          double? annualizedYield;
+                          if (yieldRate != null &&
+                              startDate != null &&
+                              yieldRate > -1) {
+                            final days =
+                                DateTime.now().difference(startDate).inDays;
+                            if (days > 0) {
+                              annualizedYield =
+                                  math.pow(1 + yieldRate, 365 / days) - 1;
+                            }
+                          }
                           return ListTile(
                             title: Text(row['product_name'] ?? '理财产品'),
                             subtitle: Text(
-                              '${row['type'] ?? ''} · ${row['product_code'] ?? ''} · 本金 ${row['principal'] ?? ''} · 净值 ${row['nav'] ?? ''} · 份额 ${row['shares'] ?? ''}',
+                              [
+                                row['type'] ?? '',
+                                row['product_code'] ?? '',
+                                if (principal != null)
+                                  '成本 ${_formatNumber(principal)}',
+                                if (nav != null) '净值 ${_formatNumber(nav)}',
+                                if (shares != null)
+                                  '份额 ${_formatNumber(shares)}',
+                                if (marketValue != null)
+                                  '市值 ${_formatNumber(marketValue)}',
+                                if (yieldRate != null)
+                                  '收益率 ${_formatPercent(yieldRate)}',
+                                if (annualizedYield != null)
+                                  '年化 ${_formatPercent(annualizedYield)}',
+                                if ((row['start_date'] ?? '')
+                                    .toString()
+                                    .trim()
+                                    .isNotEmpty ||
+                                    (row['end_date'] ?? '')
+                                        .toString()
+                                        .trim()
+                                        .isNotEmpty)
+                                  '${row['start_date'] ?? ''} ~ ${row['end_date'] ?? ''}',
+                              ]
+                                  .where((text) =>
+                                      text.toString().trim().isNotEmpty)
+                                  .join(' · '),
                             ),
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
