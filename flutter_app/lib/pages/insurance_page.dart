@@ -239,10 +239,10 @@ class _InsurancePageState extends State<InsurancePage> {
                         style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                       ),
                     ),
-                    ElevatedButton.icon(
+                    IconButton.filled(
                       onPressed: () => _showInsuranceDialog(),
+                      tooltip: '新增',
                       icon: const Icon(Icons.add),
-                      label: const Text('新增'),
                     ),
                   ],
                 ),
@@ -260,15 +260,15 @@ class _InsurancePageState extends State<InsurancePage> {
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                ElevatedButton.icon(
+                                IconButton(
                                   icon: const Icon(Icons.edit, size: 20),
                                   onPressed: () => _showInsuranceDialog(insurance: row),
-                                  label: const Text('编辑'),
+                                  tooltip: '编辑',
                                 ),
-                                ElevatedButton.icon(
+                                IconButton(
                                   icon: const Icon(Icons.delete, size: 20),
                                   onPressed: () => _deleteInsurance(row),
-                                  label: const Text('删除'),
+                                  tooltip: '删除',
                                 ),
                               ],
                             ),

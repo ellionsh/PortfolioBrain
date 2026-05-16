@@ -57,6 +57,16 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
     return '${(value * 100).toStringAsFixed(fraction)}%';
   }
 
+  String _formatDateRange(dynamic start, dynamic end) {
+    final startText = (start ?? '').toString().trim();
+    final endText = (end ?? '').toString().trim();
+    if (startText.isEmpty && endText.isEmpty) return '';
+    final displayStart = startText.isEmpty ? '至今' : startText;
+    final displayEnd = endText.isEmpty ? '至今' : endText;
+    if (displayStart == displayEnd) return displayStart;
+    return '$displayStart ~ $displayEnd';
+  }
+
   String _today() => DateTime.now().toIso8601String().substring(0, 10);
 
   Future<void> _showProductDialog({Map<String, dynamic>? product}) async {
@@ -664,15 +674,14 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
                                   '收益率 ${_formatPercent(yieldRate)}',
                                 if (annualizedYield != null)
                                   '年化 ${_formatPercent(annualizedYield)}',
-                                if ((row['start_date'] ?? '')
-                                    .toString()
-                                    .trim()
-                                    .isNotEmpty ||
-                                    (row['end_date'] ?? '')
-                                        .toString()
-                                        .trim()
-                                        .isNotEmpty)
-                                  '${row['start_date'] ?? ''} ~ ${row['end_date'] ?? ''}',
+                                if (_formatDateRange(
+                                      row['start_date'],
+                                      row['end_date'],
+                                    ).isNotEmpty)
+                                  _formatDateRange(
+                                    row['start_date'],
+                                    row['end_date'],
+                                  ),
                               ]
                                   .where((text) =>
                                       text.toString().trim().isNotEmpty)
