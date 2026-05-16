@@ -278,6 +278,37 @@ class AssetOperator:
         return {"status": "success"}
     def _sell_fund(self, fund_id, account_id, shares, nav, date):
         amount = shares * nav
+        row = self.session.execute(text("""
+            SELECT shares, principal
+            FROM fund_products
+            WHERE id=:fid
+            FOR UPDATE
+        """), {"fid": fund_id}).first()
+        current_shares = row[0] if row else None
+        current_principal = row[1] if row else None
+        principal_reduction = Decimal("0")
+        try:
+            if current_shares and current_principal is not None:
+                current_shares_dec = (
+                    current_shares
+                    if isinstance(current_shares, Decimal)
+                    else Decimal(str(current_shares))
+                )
+                if current_shares_dec > 0:
+                    shares_dec = (
+                        shares if isinstance(shares, Decimal) else Decimal(str(shares))
+                    )
+                    ratio = shares_dec / current_shares_dec
+                    if ratio < 0:
+                        ratio = Decimal("0")
+                    principal_dec = (
+                        current_principal
+                        if isinstance(current_principal, Decimal)
+                        else Decimal(str(current_principal))
+                    )
+                    principal_reduction = principal_dec * ratio
+        except (InvalidOperation, ZeroDivisionError):
+            principal_reduction = Decimal("0")
         self.session.execute(text("""
             INSERT INTO fund_transactions (
                 fund_id, account_id, trade_date, trade_type,
@@ -287,9 +318,14 @@ class AssetOperator:
             "shares": shares, "amount": amount, "nav": nav})
         self.session.execute(text("""
             UPDATE fund_products
-            SET shares = shares - :shares
+            SET shares = shares - :shares,
+                principal = COALESCE(principal,0) - :principal_reduction
             WHERE id=:fid
-        """), {"shares": shares, "fid": fund_id})
+        """), {
+            "shares": shares,
+            "principal_reduction": principal_reduction,
+            "fid": fund_id,
+        })
         fund_code = self._get_fund_code(fund_id)
         if not fund_code:
             self.session.rollback()
