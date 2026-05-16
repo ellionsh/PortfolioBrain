@@ -43,6 +43,7 @@ class _PortfolioBrainAppState extends State<PortfolioBrainApp> {
 
   late ApiServerConfig _config;
   int _configVersion = 0;
+  int _homeReloadVersion = 0;
 
   @override
   void initState() {
@@ -62,6 +63,15 @@ class _PortfolioBrainAppState extends State<PortfolioBrainApp> {
       _config = config;
       _index = 0;
       _configVersion++;
+    });
+  }
+
+  void _refreshHome({bool ensureIndex = false}) {
+    setState(() {
+      _homeReloadVersion++;
+      if (ensureIndex) {
+        _index = 0;
+      }
     });
   }
 
@@ -86,7 +96,7 @@ class _PortfolioBrainAppState extends State<PortfolioBrainApp> {
     final version = _configVersion;
     return [
       KeyedSubtree(
-        key: ValueKey('home_$version'),
+        key: ValueKey('home_${version}_$_homeReloadVersion'),
         child: const HomePage(),
       ),
       KeyedSubtree(
@@ -149,6 +159,11 @@ class _PortfolioBrainAppState extends State<PortfolioBrainApp> {
                     selectedIndex: _index,
 
                     onDestinationSelected: (i) {
+                      if (i == 0) {
+                        _refreshHome(ensureIndex: true);
+                        return;
+                      }
+
                       setState(() {
                         _index = i;
                       });
