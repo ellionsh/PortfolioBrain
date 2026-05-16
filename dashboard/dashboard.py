@@ -113,7 +113,7 @@ else:
 st.header("净值型理财净值曲线（NAV Curve）")
 
 df_nav = pd.read_sql("""
-    SELECT product_id, date, nav
+    SELECT product_code, date, nav
     FROM financial_navs
     ORDER BY date
 """, conn)
@@ -123,10 +123,9 @@ if len(df_nav) > 0:
         df_nav,
         x="date",
         y="nav",
-        color="product_id",
+        color="product_code",
         title="净值曲线（按产品）"
     )
     st.plotly_chart(fig, use_container_width=True)
 else:
     st.info("暂无净值数据")
-

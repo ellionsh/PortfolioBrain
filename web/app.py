@@ -47,7 +47,7 @@ def index():
             "/cashflows",
             "/products",
             "/fund_products",
-            "/nav/<id>",
+            "/nav/<product_code>",
             "/operate"
         ]
     }
@@ -108,7 +108,7 @@ def get_financial_products():
                (
                    SELECT fn.nav
                    FROM financial_navs fn
-                   WHERE fn.product_id = fp.id
+                   WHERE fn.product_code = fp.product_code
                    ORDER BY fn.date DESC
                    LIMIT 1
                ) AS nav
@@ -127,7 +127,7 @@ def get_fund_products():
                (
                    SELECT fn.nav
                    FROM fund_navs fn
-                   WHERE fn.fund_id = f.id
+                   WHERE fn.fund_code = f.fund_code
                    ORDER BY fn.date DESC
                    LIMIT 1
                ) AS nav
@@ -239,14 +239,14 @@ def products():
 # ============================
 # 6. 净值曲线
 # ============================
-@app.route("/nav/<int:pid>", methods=["GET"])
-def nav_curve(pid):
+@app.route("/nav/<product_code>", methods=["GET"])
+def nav_curve(product_code):
     df = pd.read_sql("""
         SELECT date, nav
         FROM financial_navs
-        WHERE product_id=%s
+        WHERE product_code=%s
         ORDER BY date
-    """, engine, params=[pid])
+    """, engine, params=[product_code])
     return df.to_dict(orient="records")
 
 
@@ -294,4 +294,3 @@ if __name__ == "__main__":
         port=config.API_PORT,
         debug=config.DEBUG
     )
-

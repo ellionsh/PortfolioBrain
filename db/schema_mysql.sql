@@ -79,11 +79,11 @@ CREATE TABLE financial_transactions (
 
 -- 5. financial_navs（理财净值）
 CREATE TABLE financial_navs (
-    product_id INT,
+    product_code VARCHAR(100),
     date DATE,
     nav DECIMAL(18,4),
     currency VARCHAR(10),
-    PRIMARY KEY (product_id, date)
+    PRIMARY KEY (product_code, date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 6. fund_products（基金主数据）
@@ -121,11 +121,11 @@ CREATE TABLE fund_transactions (
 
 -- 8. fund_navs（基金净值）
 CREATE TABLE fund_navs (
-    fund_id INT,
+    fund_code VARCHAR(100),
     date DATE,
     nav DECIMAL(18,4),
     currency VARCHAR(10),
-    PRIMARY KEY (fund_id, date)
+    PRIMARY KEY (fund_code, date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 9. insurance_products（保险产品）
@@ -239,24 +239,24 @@ SELECT
     (SELECT COALESCE(SUM(fp.shares * fn.nav),0)
      FROM financial_products fp
      JOIN (
-         SELECT product_id, MAX(date) AS latest_date
+         SELECT product_code, MAX(date) AS latest_date
          FROM financial_navs
-         GROUP BY product_id
-     ) latest ON fp.id = latest.product_id
+         GROUP BY product_code
+     ) latest ON fp.product_code = latest.product_code
      JOIN financial_navs fn 
-       ON fn.product_id = latest.product_id AND fn.date = latest.latest_date
+       ON fn.product_code = latest.product_code AND fn.date = latest.latest_date
      WHERE fp.status='active') AS financial_assets,
 
     -- 基金市值（份额 × 最新净值）
     (SELECT COALESCE(SUM(f.shares * fn.nav),0)
      FROM fund_products f
      JOIN (
-         SELECT fund_id, MAX(date) AS latest_date
+         SELECT fund_code, MAX(date) AS latest_date
          FROM fund_navs
-         GROUP BY fund_id
-     ) latest ON f.id = latest.fund_id
+         GROUP BY fund_code
+     ) latest ON f.fund_code = latest.fund_code
      JOIN fund_navs fn 
-       ON fn.fund_id = latest.fund_id AND fn.date = latest.latest_date
+       ON fn.fund_code = latest.fund_code AND fn.date = latest.latest_date
      WHERE f.status='active') AS fund_assets,
 
     -- 保险现金价值
@@ -271,23 +271,23 @@ SELECT
       (SELECT COALESCE(SUM(fp.shares * fn.nav),0)
        FROM financial_products fp
        JOIN (
-           SELECT product_id, MAX(date) AS latest_date
+           SELECT product_code, MAX(date) AS latest_date
            FROM financial_navs
-           GROUP BY product_id
-       ) latest ON fp.id = latest.product_id
+           GROUP BY product_code
+       ) latest ON fp.product_code = latest.product_code
        JOIN financial_navs fn 
-         ON fn.product_id = latest.product_id AND fn.date = latest.latest_date
+         ON fn.product_code = latest.product_code AND fn.date = latest.latest_date
        WHERE fp.status='active')
       +
       (SELECT COALESCE(SUM(f.shares * fn.nav),0)
        FROM fund_products f
        JOIN (
-           SELECT fund_id, MAX(date) AS latest_date
+           SELECT fund_code, MAX(date) AS latest_date
            FROM fund_navs
-           GROUP BY fund_id
-       ) latest ON f.id = latest.fund_id
+           GROUP BY fund_code
+       ) latest ON f.fund_code = latest.fund_code
        JOIN fund_navs fn 
-         ON fn.fund_id = latest.fund_id AND fn.date = latest.latest_date
+         ON fn.fund_code = latest.fund_code AND fn.date = latest.latest_date
        WHERE f.status='active')
       +
       (SELECT COALESCE(SUM(cash_value),0) FROM insurance_products WHERE status='active')
@@ -303,5 +303,4 @@ CREATE TABLE migration_logs (
     message TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
 

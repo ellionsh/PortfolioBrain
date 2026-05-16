@@ -3,7 +3,8 @@ import os
 from migrate.migrate_bank import migrate_bank
 from migrate.migrate_financial import (
     migrate_financial_products,
-    migrate_financial_transactions
+    migrate_financial_transactions,
+    migrate_financial_navs
 )
 from migrate.migrate_insurance import migrate_insurance
 from migrate.migrate_fund import (
@@ -34,6 +35,8 @@ def migrate_all(engine):
 
         elif file.startswith("financial_transactions_"):
             results[file] = migrate_financial_transactions(engine, path)
+        elif file.startswith("financial_navs_"):
+            results[file] = migrate_financial_navs(engine, path)
 
         # ============================
         # 保险产品

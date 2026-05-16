@@ -95,7 +95,7 @@ def migrate_fund_navs(engine, path):
     df["currency"] = df.get("currency", "CNY")
 
     required_cols = [
-        "fund_id",
+        "fund_code",
         "date",
         "nav",
         "currency"

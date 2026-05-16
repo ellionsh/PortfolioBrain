@@ -84,3 +84,35 @@ def migrate_financial_transactions(engine, path):
     )
 
     return {"status": "success", "rows": len(df)}
+
+
+# ============================================
+# 迁移 financial_navs（理财净值）
+# ============================================
+def migrate_financial_navs(engine, path):
+    df = pd.read_excel(path)
+    df = normalize_columns(df)
+
+    df["currency"] = df.get("currency", "CNY")
+
+    required_cols = [
+        "product_code",
+        "date",
+        "nav",
+        "currency"
+    ]
+
+    for col in required_cols:
+        if col not in df.columns:
+            df[col] = None
+
+    df = df[required_cols]
+
+    df.to_sql(
+        "financial_navs",
+        engine,
+        if_exists="append",
+        index=False
+    )
+
+    return {"status": "success", "rows": len(df)}

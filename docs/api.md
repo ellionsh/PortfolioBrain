@@ -16,7 +16,7 @@ GET /cashflows
 ## 5. 理财产品
 GET /products
 ## 6. 净值曲线
-GET /nav/<product_id>
+GET /nav/<product_code>
 ## 7. 操作接口
 POST /operate
 {

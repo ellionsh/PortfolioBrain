@@ -18,6 +18,18 @@ class AssetOperator:
     def __init__(self, session):
         self.session = session
 
+    def _get_product_code(self, product_id):
+        return self.session.execute(
+            text("SELECT product_code FROM financial_products WHERE id=:id"),
+            {"id": product_id},
+        ).scalar()
+
+    def _get_fund_code(self, fund_id):
+        return self.session.execute(
+            text("SELECT fund_code FROM fund_products WHERE id=:id"),
+            {"id": fund_id},
+        ).scalar()
+
     # ============================
     # 1. 买入（Buy）
     # ============================
@@ -102,11 +114,15 @@ class AssetOperator:
             "date": date,
             "fid": fund_id,
         })
+        fund_code = self._get_fund_code(fund_id)
+        if not fund_code:
+            self.session.rollback()
+            return {"error": "找不到基金代码"}
         self.session.execute(text("""
-            INSERT INTO fund_navs (fund_id, date, nav, currency)
-            VALUES (:fid, :date, :nav, 'CNY')
+            INSERT INTO fund_navs (fund_code, date, nav, currency)
+            VALUES (:fcode, :date, :nav, 'CNY')
             ON DUPLICATE KEY UPDATE nav=:nav
-        """), {"fid": fund_id, "date": date, "nav": nav})
+        """), {"fcode": fund_code, "date": date, "nav": nav})
         self.session.commit()
         return {"status": "success", "shares": float(shares)}
 
@@ -231,11 +247,15 @@ class AssetOperator:
             SET shares = shares - :shares
             WHERE id=:fid
         """), {"shares": shares, "fid": fund_id})
+        fund_code = self._get_fund_code(fund_id)
+        if not fund_code:
+            self.session.rollback()
+            return {"error": "找不到基金代码"}
         self.session.execute(text("""
-            INSERT INTO fund_navs (fund_id, date, nav, currency)
-            VALUES (:fid, :date, :nav, 'CNY')
+            INSERT INTO fund_navs (fund_code, date, nav, currency)
+            VALUES (:fcode, :date, :nav, 'CNY')
             ON DUPLICATE KEY UPDATE nav=:nav
-        """), {"fid": fund_id, "date": date, "nav": nav})
+        """), {"fcode": fund_code, "date": date, "nav": nav})
         self.session.commit()
         return {"status": "success", "amount": float(amount)}
 
@@ -257,13 +277,19 @@ class AssetOperator:
     # ============================
     # 3. 更新净值
     # ============================
-    def update_nav(self, product_id, date, nav):
+    def update_nav(self, product_id=None, product_code=None, date=None, nav=None):
+        if product_code is None:
+            if product_id is None:
+                return {"error": "缺少产品代码或ID"}
+            product_code = self._get_product_code(product_id)
+        if not product_code:
+            return {"error": "找不到产品代码"}
         self.session.execute(text("""
-            INSERT INTO financial_navs (product_id, date, nav, currency)
-            VALUES (:pid, :date, :nav, 'CNY')
+            INSERT INTO financial_navs (product_code, date, nav, currency)
+            VALUES (:pcode, :date, :nav, 'CNY')
             ON DUPLICATE KEY UPDATE nav=:nav
         """), {
-            "pid": product_id,
+            "pcode": product_code,
             "date": date,
             "nav": nav
         })
@@ -271,12 +297,18 @@ class AssetOperator:
         self.session.commit()
         return {"status": "success"}
     
-    def update_fund_nav(self, fund_id, date, nav):
+    def update_fund_nav(self, fund_id=None, fund_code=None, date=None, nav=None):
+        if fund_code is None:
+            if fund_id is None:
+                return {"error": "缺少基金代码或ID"}
+            fund_code = self._get_fund_code(fund_id)
+        if not fund_code:
+            return {"error": "找不到基金代码"}
         self.session.execute(text("""
-            INSERT INTO fund_navs (fund_id, date, nav, currency)
-            VALUES (:fid, :date, :nav, 'CNY')
+            INSERT INTO fund_navs (fund_code, date, nav, currency)
+            VALUES (:fcode, :date, :nav, 'CNY')
             ON DUPLICATE KEY UPDATE nav=:nav
-        """), {"fid": fund_id, "date": date, "nav": nav})
+        """), {"fcode": fund_code, "date": date, "nav": nav})
         self.session.commit()
         return {"status": "success"}
 
@@ -439,11 +471,11 @@ class AssetOperator:
         product_id = self.session.execute(text("SELECT LAST_INSERT_ID()")).scalar()
         if nav is not None:
             self.session.execute(text("""
-                INSERT INTO financial_navs (product_id, date, nav, currency)
-                VALUES (:product_id, CURDATE(), :nav, :currency)
+                INSERT INTO financial_navs (product_code, date, nav, currency)
+                VALUES (:product_code, CURDATE(), :nav, :currency)
                 ON DUPLICATE KEY UPDATE nav=:nav
             """), {
-                "product_id": product_id,
+                "product_code": product_code,
                 "nav": nav,
                 "currency": currency,
             })
@@ -475,12 +507,19 @@ class AssetOperator:
             sql = f"UPDATE financial_products SET {', '.join(fields)} WHERE id=:id"
             self.session.execute(text(sql), params)
         if nav is not None:
+            if "product_code" in kwargs:
+                product_code = kwargs["product_code"]
+            else:
+                product_code = self._get_product_code(id)
+            if not product_code:
+                self.session.rollback()
+                return {"error": "找不到产品代码"}
             self.session.execute(text("""
-                INSERT INTO financial_navs (product_id, date, nav, currency)
-                VALUES (:id, CURDATE(), :nav, :currency)
+                INSERT INTO financial_navs (product_code, date, nav, currency)
+                VALUES (:product_code, CURDATE(), :nav, :currency)
                 ON DUPLICATE KEY UPDATE nav=:nav
             """), {
-                "id": id,
+                "product_code": product_code,
                 "nav": nav,
                 "currency": currency,
             })
@@ -517,11 +556,11 @@ class AssetOperator:
         fund_id = self.session.execute(text("SELECT LAST_INSERT_ID()")).scalar()
         if nav is not None:
             self.session.execute(text("""
-                INSERT INTO fund_navs (fund_id, date, nav, currency)
-                VALUES (:fid, COALESCE(:start_date, CURDATE()), :nav, :currency)
+                INSERT INTO fund_navs (fund_code, date, nav, currency)
+                VALUES (:fcode, COALESCE(:start_date, CURDATE()), :nav, :currency)
                 ON DUPLICATE KEY UPDATE nav=:nav
             """), {
-                "fid": fund_id,
+                "fcode": fund_code,
                 "start_date": start_date,
                 "nav": nav,
                 "currency": currency,
@@ -556,12 +595,19 @@ class AssetOperator:
             sql = f"UPDATE fund_products SET {', '.join(fields)} WHERE id=:id"
             self.session.execute(text(sql), params)
         if nav is not None:
+            if "fund_code" in kwargs:
+                fund_code = kwargs["fund_code"]
+            else:
+                fund_code = self._get_fund_code(id)
+            if not fund_code:
+                self.session.rollback()
+                return {"error": "找不到基金代码"}
             self.session.execute(text("""
-                INSERT INTO fund_navs (fund_id, date, nav, currency)
-                VALUES (:id, COALESCE(:date, CURDATE()), :nav, :currency)
+                INSERT INTO fund_navs (fund_code, date, nav, currency)
+                VALUES (:fund_code, COALESCE(:date, CURDATE()), :nav, :currency)
                 ON DUPLICATE KEY UPDATE nav=:nav
             """), {
-                "id": id,
+                "fund_code": fund_code,
                 "date": nav_date,
                 "nav": nav,
                 "currency": currency,
