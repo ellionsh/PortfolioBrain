@@ -10,17 +10,17 @@ class FinancialProductsPage extends StatefulWidget {
 }
 
 class _FinancialProductsPageState extends State<FinancialProductsPage> {
-  late Future<List<dynamic>> _future;
+  late Future<_FinancialProductsData> _future;
 
   @override
   void initState() {
     super.initState();
-    _future = ApiClient.getFinancialProducts();
+    _future = _load();
   }
 
   Future<void> _refresh() async {
     setState(() {
-      _future = ApiClient.getFinancialProducts();
+      _future = _load();
     });
   }
 
@@ -597,7 +597,7 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: FutureBuilder<List<dynamic>>(
+        child: FutureBuilder<_FinancialProductsData>(
         future: _future,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
@@ -606,7 +606,7 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
           if (snapshot.hasError) {
             return Center(child: Text('加载失败: ${snapshot.error}'));
           }
-          final data = snapshot.data ?? [];
+          final data = snapshot.data!;
           return Column(
             children: [
               Padding(
@@ -628,9 +628,9 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
                 ),
               ),
               Expanded(
-                child: data.isEmpty
+                child: data.products.isEmpty
                     ? const Center(child: Text('暂无理财产品'))
-                    : ListView.builder(
+                    : _buildList(data),
                         itemCount: data.length,
                         itemBuilder: (context, i) {
                           final row = data[i] as Map<String, dynamic>;
