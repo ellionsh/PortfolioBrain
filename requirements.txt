@@ -6,3 +6,4 @@ python-dateutil
 pytest
 openai
 schedule
+akshare

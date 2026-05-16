@@ -549,15 +549,23 @@ class AssetOperator:
         })
         product_id = self.session.execute(text("SELECT LAST_INSERT_ID()")).scalar()
         if nav is not None:
-            self.session.execute(text("""
-                INSERT INTO financial_navs (product_code, date, nav, currency)
-                VALUES (:product_code, CURDATE(), :nav, :currency)
-                ON DUPLICATE KEY UPDATE nav=:nav
+            nav_exists = self.session.execute(text("""
+                SELECT 1
+                FROM financial_navs
+                WHERE product_code=:product_code AND date=CURDATE()
+                LIMIT 1
             """), {
-                "product_code": product_code,
-                "nav": nav,
-                "currency": currency,
-            })
+                "product_code": product_code}).scalar()
+            if not nav_exists:
+                self.session.execute(text("""
+                    INSERT INTO financial_navs (product_code, date, nav, currency)
+                    VALUES (:product_code, CURDATE(), :nav, :currency)
+                    ON DUPLICATE KEY UPDATE nav=:nav
+                """), {
+                    "product_code": product_code,
+                    "nav": nav,
+                    "currency": currency,
+                })
         self.session.commit()
         return {
             "status": "success",
@@ -634,16 +642,25 @@ class AssetOperator:
                "status": status, "remark": remark})
         fund_id = self.session.execute(text("SELECT LAST_INSERT_ID()")).scalar()
         if nav is not None:
-            self.session.execute(text("""
-                INSERT INTO fund_navs (fund_code, date, nav, currency)
-                VALUES (:fcode, COALESCE(:start_date, CURDATE()), :nav, :currency)
-                ON DUPLICATE KEY UPDATE nav=:nav
+            nav_exists = self.session.execute(text("""
+                SELECT 1
+                FROM fund_navs
+                WHERE fund_code=:fcode AND date=COALESCE(:start_date, CURDATE())
+                LIMIT 1
             """), {
-                "fcode": fund_code,
-                "start_date": start_date,
-                "nav": nav,
-                "currency": currency,
-            })
+                "fcode": fund_code, 
+                "start_date": start_date}).scalar()
+            if not nav_exists:
+                self.session.execute(text("""
+                    INSERT INTO fund_navs (fund_code, date, nav, currency)
+                    VALUES (:fcode, COALESCE(:start_date, CURDATE()), :nav, :currency)
+                    ON DUPLICATE KEY UPDATE nav=:nav
+                """), {
+                    "fcode": fund_code,
+                    "start_date": start_date,
+                    "nav": nav,
+                    "currency": currency,
+                })
         self.session.commit()
         return {
             "status": "success",
