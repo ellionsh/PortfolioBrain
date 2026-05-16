@@ -552,7 +552,7 @@ class AssetOperator:
             nav_exists = self.session.execute(text("""
                 SELECT 1
                 FROM financial_navs
-                WHERE product_code=:product_code AND date=CURDATE()
+                WHERE product_code=:product_code
                 LIMIT 1
             """), {
                 "product_code": product_code}).scalar()
@@ -645,7 +645,7 @@ class AssetOperator:
             nav_exists = self.session.execute(text("""
                 SELECT 1
                 FROM fund_navs
-                WHERE fund_code=:fcode AND date=COALESCE(:start_date, CURDATE())
+                WHERE fund_code=:fcode
                 LIMIT 1
             """), {
                 "fcode": fund_code, 
