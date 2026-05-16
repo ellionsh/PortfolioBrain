@@ -199,6 +199,20 @@ class AssetOperator:
     # --- 净值型理财赎回 ---
     def _sell_nav_financial(self, product_id, account_id, shares, nav, date):
         amount = shares * nav
+        row = self.session.execute(text("""
+            SELECT shares, principal
+            FROM financial_products
+            WHERE id=:pid
+            FOR UPDATE
+        """), {"pid": product_id}).first()
+        current_shares = row[0] if row else None
+        current_principal = row[1] if row else None
+        principal_reduction = 0
+        if current_shares and current_shares > 0 and current_principal is not None:
+            ratio = shares / current_shares
+            if ratio < 0:
+                ratio = 0
+            principal_reduction = current_principal * ratio
         # 插入交易记录
         self.session.execute(text("""
             INSERT INTO financial_transactions (
@@ -211,9 +225,13 @@ class AssetOperator:
         self.session.execute(text("""
             UPDATE financial_products
             SET shares = shares - :shares,
-                principal = COALESCE(principal,0) - :amount
+                principal = COALESCE(principal,0) - :principal_reduction
             WHERE id=:pid
-        """), {"shares": shares, "amount": amount, "pid": product_id})
+        """), {
+            "shares": shares,
+            "principal_reduction": principal_reduction,
+            "pid": product_id,
+        })
         self.session.commit()
         return {"status": "success", "amount": float(amount)}
 
