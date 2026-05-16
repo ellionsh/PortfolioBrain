@@ -24,6 +24,24 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
     });
   }
 
+  Future<_FinancialProductsData> _load() async {
+    final accounts = await ApiClient.getAccounts();
+    final products = await ApiClient.getFinancialProducts();
+
+    final Map<int, String> accountNames = {};
+    for (final row in accounts) {
+      final m = row as Map<String, dynamic>;
+      final id = (m['id'] as num).toInt();
+      final name = m['name'] as String? ?? '未命名账户';
+      accountNames[id] = name;
+    }
+
+    return _FinancialProductsData(
+      products: products,
+      accountNames: accountNames,
+    );
+  }
+
   bool _isNavProduct(Map<String, dynamic> product) {
     return product['is_nav_based'] == 1 ||
         product['is_nav_based'] == true ||
@@ -308,12 +326,13 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
       return;
     }
 
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
     final response = await ApiClient.operate(
       'financial_product_delete',
       {'id': product['id']},
     );
     if (!context.mounted) return;
-    final messenger = ScaffoldMessenger.of(context);
     if (response.containsKey('error')) {
       messenger.showSnackBar(
         SnackBar(content: Text(response['error'].toString())),
@@ -597,7 +616,7 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-        child: FutureBuilder<_FinancialProductsData>(
+      child: FutureBuilder<_FinancialProductsData>(
         future: _future,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
@@ -631,96 +650,6 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
                 child: data.products.isEmpty
                     ? const Center(child: Text('暂无理财产品'))
                     : _buildList(data),
-                        itemCount: data.length,
-                        itemBuilder: (context, i) {
-                          final row = data[i] as Map<String, dynamic>;
-                          final shares = _parseDouble(row['shares']);
-                          final nav = _parseDouble(row['nav']);
-                          final principal = _parseDouble(row['principal']);
-                          final marketValue = (shares != null && nav != null)
-                              ? shares * nav
-                              : null;
-                          final yieldRate = (marketValue != null &&
-                                  principal != null &&
-                                  principal > 0)
-                              ? (marketValue - principal) / principal
-                              : null;
-                          final startDate = _parseDate(row['start_date']);
-                          double? annualizedYield;
-                          if (yieldRate != null &&
-                              startDate != null &&
-                              yieldRate > -1) {
-                            final days =
-                                DateTime.now().difference(startDate).inDays;
-                            if (days > 0) {
-                              annualizedYield =
-                                  math.pow(1 + yieldRate, 365 / days) - 1;
-                            }
-                          }
-                          return ListTile(
-                            title: Text(row['product_name'] ?? '理财产品'),
-                            subtitle: Text(
-                              [
-                                row['type'] ?? '',
-                                row['product_code'] ?? '',
-                                if (principal != null)
-                                  '成本 ${_formatNumber(principal)}',
-                                if (nav != null) '净值 ${_formatNumber(nav)}',
-                                if (shares != null)
-                                  '份额 ${_formatNumber(shares)}',
-                                if (marketValue != null)
-                                  '市值 ${_formatNumber(marketValue)}',
-                                if (yieldRate != null)
-                                  '收益率 ${_formatPercent(yieldRate)}',
-                                if (annualizedYield != null)
-                                  '年化 ${_formatPercent(annualizedYield)}',
-                                if (_formatDateRange(
-                                      row['start_date'],
-                                      row['end_date'],
-                                    ).isNotEmpty)
-                                  _formatDateRange(
-                                    row['start_date'],
-                                    row['end_date'],
-                                  ),
-                              ]
-                                  .where((text) =>
-                                      text.toString().trim().isNotEmpty)
-                                  .join(' · '),
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.add_shopping_cart,
-                                    size: 20,
-                                  ),
-                                  onPressed: () => _buyProduct(row),
-                                  tooltip: '买入',
-                                ),
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.currency_exchange,
-                                    size: 20,
-                                  ),
-                                  onPressed: () => _redeemProduct(row),
-                                  tooltip: '赎回',
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.edit, size: 20),
-                                  onPressed: () => _showProductDialog(product: row),
-                                  tooltip: '编辑',
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete, size: 20),
-                                  onPressed: () => _deleteProduct(row),
-                                  tooltip: '删除',
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
               ),
             ],
           );
@@ -728,4 +657,87 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
       ),
     );
   }
+
+  Widget _buildList(_FinancialProductsData d) {
+    final Map<String, List<Map<String, dynamic>>> grouped = {};
+    for (final row in d.products) {
+      final m = row as Map<String, dynamic>;
+      final id = (m['account_id'] as num?)?.toInt();
+      final name = d.accountNames[id] ?? '未知账户';
+
+      grouped.putIfAbsent(name, () => []);
+      grouped[name]!.add(m);
+    }
+
+    final accountNames = grouped.keys.toList()..sort();
+
+    return ListView(
+      children: accountNames.map((name) {
+        final items = grouped[name]!;
+        return ExpansionTile(
+          title: Text(
+            name,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          children: items.map((m) {
+            final shares = _parseDouble(m['shares']);
+            final nav = _parseDouble(m['nav']);
+            final principal = _parseDouble(m['principal']);
+            final marketValue = (shares != null && nav != null) ? shares * nav : null;
+            final yieldRate = (marketValue != null && principal != null && principal > 0)
+                ? (marketValue - principal) / principal
+                : null;
+            final startDate = _parseDate(m['start_date']);
+            double? annualizedYield;
+            if (yieldRate != null && startDate != null && yieldRate > -1) {
+              final days = DateTime.now().difference(startDate).inDays;
+              if (days > 0) {
+                annualizedYield = math.pow(1 + yieldRate, 365 / days) - 1;
+              }
+            }
+
+            return ListTile(
+              title: Text(m['product_name'] ?? '理财产品'),
+              subtitle: Text(
+                [
+                  m['type'] ?? '',
+                  m['product_code'] ?? '',
+                  if (principal != null) '成本 ${_formatNumber(principal)}',
+                  if (nav != null) '净值 ${_formatNumber(nav)}',
+                  if (shares != null) '份额 ${_formatNumber(shares)}',
+                  if (marketValue != null) '市值 ${_formatNumber(marketValue)}',
+                  if (yieldRate != null) '收益率 ${_formatPercent(yieldRate)}',
+                  if (annualizedYield != null) '年化 ${_formatPercent(annualizedYield)}',
+                  if (_formatDateRange(m['start_date'], m['end_date']).isNotEmpty)
+                    _formatDateRange(m['start_date'], m['end_date']),
+                ]
+                    .where((text) => text.toString().trim().isNotEmpty)
+                    .join(' · '),
+              ),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(icon: const Icon(Icons.add_shopping_cart, size: 20), onPressed: () => _buyProduct(m), tooltip: '买入'),
+                  IconButton(icon: const Icon(Icons.currency_exchange, size: 20), onPressed: () => _redeemProduct(m), tooltip: '赎回'),
+                  IconButton(icon: const Icon(Icons.edit, size: 20), onPressed: () => _showProductDialog(product: m), tooltip: '编辑'),
+                  IconButton(icon: const Icon(Icons.delete, size: 20), onPressed: () => _deleteProduct(m), tooltip: '删除'),
+                ],
+              ),
+            );
+          }).toList(),
+        );
+      }).toList(),
+    );
+  }
+}
+
+/// Wraps loaded products and account name lookup.
+class _FinancialProductsData {
+  final List<dynamic> products;
+  final Map<int, String> accountNames;
+
+  _FinancialProductsData({
+    required this.products,
+    required this.accountNames,
+  });
 }

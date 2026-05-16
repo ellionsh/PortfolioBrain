@@ -203,9 +203,11 @@ class _InsurancePageState extends State<InsurancePage> {
       return;
     }
 
-    final response = await ApiClient.operate('insurance_delete', {'id': insurance['id']});
-    if (!context.mounted) return;
+    if (!mounted) return;
     final messenger = ScaffoldMessenger.of(context);
+    final response =
+        await ApiClient.operate('insurance_delete', {'id': insurance['id']});
+    if (!context.mounted) return;
     if (response.containsKey('error')) {
       messenger.showSnackBar(SnackBar(content: Text(response['error'].toString())));
       return;

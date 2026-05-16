@@ -257,10 +257,11 @@ class _FundProductsPageState extends State<FundProductsPage> {
       return;
     }
 
+    if (!mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
     final response =
         await ApiClient.operate('fund_product_delete', {'id': fund['id']});
     if (!context.mounted) return;
-    final messenger = ScaffoldMessenger.of(context);
     if (response.containsKey('error')) {
       messenger.showSnackBar(
         SnackBar(content: Text(response['error'].toString())),
