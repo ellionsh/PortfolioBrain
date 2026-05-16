@@ -11,18 +11,36 @@ class FundProductsPage extends StatefulWidget {
 }
 
 class _FundProductsPageState extends State<FundProductsPage> {
-  late Future<List<dynamic>> _future;
+  late Future<_FundProductsData> _future;
 
   @override
   void initState() {
     super.initState();
-    _future = ApiClient.getFundProducts();
+    _future = _load();
   }
 
   Future<void> _refresh() async {
     setState(() {
-      _future = ApiClient.getFundProducts();
+      _future = _load();
     });
+  }
+
+  Future<_FundProductsData> _load() async {
+    final accounts = await ApiClient.getAccounts();
+    final products = await ApiClient.getFundProducts();
+
+    final Map<int, String> accountNames = {};
+    for (final row in accounts) {
+      final m = row as Map<String, dynamic>;
+      final id = (m['id'] as num).toInt();
+      final name = m['name'] as String? ?? '未命名账户';
+      accountNames[id] = name;
+    }
+
+    return _FundProductsData(
+      products: products,
+      accountNames: accountNames,
+    );
   }
 
   double? _parseDouble(dynamic value) {
@@ -489,7 +507,7 @@ class _FundProductsPageState extends State<FundProductsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<dynamic>>(
+    return FutureBuilder<_FundProductsData>(
       future: _future,
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
@@ -498,7 +516,7 @@ class _FundProductsPageState extends State<FundProductsPage> {
         if (snapshot.hasError) {
           return Center(child: Text('加载失败: ${snapshot.error}'));
         }
-        final data = snapshot.data ?? [];
+        final data = snapshot.data!;
         return Column(
           children: [
             Padding(
@@ -521,102 +539,113 @@ class _FundProductsPageState extends State<FundProductsPage> {
               ),
             ),
             Expanded(
-              child: data.isEmpty
+              child: data.products.isEmpty
                   ? const Center(child: Text('暂无基金产品'))
-                  : ListView.builder(
-                      itemCount: data.length,
-                      itemBuilder: (context, i) {
-                        final row = data[i] as Map<String, dynamic>;
-                        final shares = _parseDouble(row['shares']);
-                        final nav = _parseDouble(row['nav']);
-                        final principal = _parseDouble(row['principal']);
-                        final marketValue = (shares != null && nav != null)
-                            ? shares * nav
-                            : null;
-                        final yieldRate = (marketValue != null &&
-                                principal != null &&
-                                principal > 0)
-                            ? (marketValue - principal) / principal
-                            : null;
-                        final startDate = _parseDate(row['start_date']);
-                        double? annualizedYield;
-                        if (yieldRate != null &&
-                            startDate != null &&
-                            yieldRate > -1) {
-                          final days =
-                              DateTime.now().difference(startDate).inDays;
-                          if (days > 0) {
-                            annualizedYield =
-                                math.pow(1 + yieldRate, 365 / days) - 1;
-                          }
-                        }
-                        return ListTile(
-                          title: Text(row['fund_name'] ?? '基金产品'),
-                          subtitle: Text(
-                            [
-                              row['fund_code'] ?? '',
-                              if (principal != null)
-                                '成本 ${_formatNumber(principal)}',
-                              if (nav != null) '净值 ${_formatNumber(nav)}',
-                              if (shares != null)
-                                '份额 ${_formatNumber(shares)}',
-                              if (marketValue != null)
-                                '市值 ${_formatNumber(marketValue)}',
-                              if (yieldRate != null)
-                                '收益率 ${_formatPercent(yieldRate)}',
-                              if (annualizedYield != null)
-                                '年化 ${_formatPercent(annualizedYield)}',
-                              if (_formatDateRange(
-                                    row['start_date'],
-                                    row['end_date'],
-                                  ).isNotEmpty)
-                                _formatDateRange(
-                                  row['start_date'],
-                                  row['end_date'],
-                                ),
-                            ]
-                                .where((text) =>
-                                    text.toString().trim().isNotEmpty)
-                                .join(' · '),
-                          ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.add_shopping_cart,
-                                  size: 20,
-                                ),
-                                onPressed: () => _buyFund(row),
-                                tooltip: '买入',
-                              ),
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.currency_exchange,
-                                  size: 20,
-                                ),
-                                onPressed: () => _redeemFund(row),
-                                tooltip: '赎回',
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.edit, size: 20),
-                                onPressed: () => _showFundDialog(fund: row),
-                                tooltip: '编辑',
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.delete, size: 20),
-                                onPressed: () => _deleteFund(row),
-                                tooltip: '删除',
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
+                  : _buildList(data),
             ),
           ],
         );
       },
     );
   }
+
+  Widget _buildList(_FundProductsData data) {
+    final Map<String, List<Map<String, dynamic>>> grouped = {};
+    for (final row in data.products) {
+      final m = row as Map<String, dynamic>;
+      final id = (m['account_id'] as num?)?.toInt();
+      final name = data.accountNames[id] ?? '未知账户';
+      grouped.putIfAbsent(name, () => []);
+      grouped[name]!.add(m);
+    }
+
+    final accountNames = grouped.keys.toList()..sort();
+
+    return ListView(
+      children: accountNames.map((name) {
+        final items = grouped[name]!;
+        return ExpansionTile(
+          title: Text(
+            name,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          children: items.map((row) {
+            final shares = _parseDouble(row['shares']);
+            final nav = _parseDouble(row['nav']);
+            final principal = _parseDouble(row['principal']);
+            final marketValue =
+                (shares != null && nav != null) ? shares * nav : null;
+            final yieldRate =
+                (marketValue != null && principal != null && principal > 0)
+                    ? (marketValue - principal) / principal
+                    : null;
+            final startDate = _parseDate(row['start_date']);
+            double? annualizedYield;
+            if (yieldRate != null && startDate != null && yieldRate > -1) {
+              final days = DateTime.now().difference(startDate).inDays;
+              if (days > 0) {
+                annualizedYield = math.pow(1 + yieldRate, 365 / days) - 1;
+              }
+            }
+
+            return ListTile(
+              title: Text(row['fund_name'] ?? '基金产品'),
+              subtitle: Text(
+                [
+                  row['fund_code'] ?? '',
+                  if (principal != null) '成本 ${_formatNumber(principal)}',
+                  if (nav != null) '净值 ${_formatNumber(nav)}',
+                  if (shares != null) '份额 ${_formatNumber(shares)}',
+                  if (marketValue != null) '市值 ${_formatNumber(marketValue)}',
+                  if (yieldRate != null) '收益率 ${_formatPercent(yieldRate)}',
+                  if (annualizedYield != null)
+                    '年化 ${_formatPercent(annualizedYield)}',
+                  if (_formatDateRange(row['start_date'], row['end_date'])
+                      .isNotEmpty)
+                    _formatDateRange(row['start_date'], row['end_date']),
+                ]
+                    .where((text) => text.toString().trim().isNotEmpty)
+                    .join(' · '),
+              ),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.add_shopping_cart, size: 20),
+                    onPressed: () => _buyFund(row),
+                    tooltip: '买入',
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.currency_exchange, size: 20),
+                    onPressed: () => _redeemFund(row),
+                    tooltip: '赎回',
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.edit, size: 20),
+                    onPressed: () => _showFundDialog(fund: row),
+                    tooltip: '编辑',
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete, size: 20),
+                    onPressed: () => _deleteFund(row),
+                    tooltip: '删除',
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        );
+      }).toList(),
+    );
+  }
+}
+
+class _FundProductsData {
+  final List<dynamic> products;
+  final Map<int, String> accountNames;
+
+  _FundProductsData({
+    required this.products,
+    required this.accountNames,
+  });
 }
