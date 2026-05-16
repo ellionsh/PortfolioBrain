@@ -1,21 +1,22 @@
 # services/fund_nav_updater.py
 import akshare as ak
-from db.session import SessionLocal
-from sqlalchemy import select
-from db.models import FundNav
+from db.db import get_session
+from sqlalchemy import text
 
 class FundNavUpdater:
 
     @staticmethod
     def update_all_funds():
         """读取 fund_navs 表中的基金代码并更新所有记录（不新增）"""
-        session = SessionLocal()
+        session = get_session()
 
         try:
             # 1. 获取所有基金代码（distinct）
-            stmt = select(FundNav.fund_code).distinct()
-            codes = [row[0] for row in session.execute(stmt).all()]
+            rows = session.execute(
+                text("SELECT DISTINCT fund_code FROM fund_navs")
+            ).fetchall()
 
+            codes = [row[0] for row in rows]
             print(f"发现基金代码: {codes}")
 
             for code in codes:
@@ -42,18 +43,15 @@ class FundNavUpdater:
         new_date = latest["净值日期"]
         new_nav = float(latest["单位净值"])
 
-        # 3. 找到该基金代码的所有记录
-        stmt = select(FundNav).where(FundNav.fund_code == code)
-        rows = session.execute(stmt).scalars().all()
+        # 3. 更新所有记录（不新增）
+        result = session.execute(
+            text("""
+                UPDATE fund_navs
+                SET date = :date, nav = :nav
+                WHERE fund_code = :code
+            """),
+            {"date": new_date, "nav": new_nav, "code": code}
+        )
 
-        if not rows:
-            print(f"⚠️ fund_navs 中没有基金 {code} 的记录，跳过")
-            return
-
-        # 4. 更新所有记录
-        for row in rows:
-            row.date = new_date
-            row.nav = new_nav
-
-        print(f"✔ 更新成功：{code} → {len(rows)} 条记录已更新为 日期={new_date} NAV={new_nav}")
+        print(f"✔ 更新成功：{code} → {result.rowcount} 条记录已更新为 日期={new_date} NAV={new_nav}")
 
