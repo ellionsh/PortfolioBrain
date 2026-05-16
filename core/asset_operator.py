@@ -1,3 +1,4 @@
+from decimal import Decimal, InvalidOperation
 from sqlalchemy import text
 
 class AssetOperator:
@@ -207,12 +208,29 @@ class AssetOperator:
         """), {"pid": product_id}).first()
         current_shares = row[0] if row else None
         current_principal = row[1] if row else None
-        principal_reduction = 0
-        if current_shares and current_shares > 0 and current_principal is not None:
-            ratio = shares / current_shares
-            if ratio < 0:
-                ratio = 0
-            principal_reduction = current_principal * ratio
+        principal_reduction = Decimal("0")
+        try:
+            if current_shares and current_principal is not None:
+                current_shares_dec = (
+                    current_shares
+                    if isinstance(current_shares, Decimal)
+                    else Decimal(str(current_shares))
+                )
+                if current_shares_dec > 0:
+                    shares_dec = (
+                        shares if isinstance(shares, Decimal) else Decimal(str(shares))
+                    )
+                    ratio = shares_dec / current_shares_dec
+                    if ratio < 0:
+                        ratio = Decimal("0")
+                    principal_dec = (
+                        current_principal
+                        if isinstance(current_principal, Decimal)
+                        else Decimal(str(current_principal))
+                    )
+                    principal_reduction = principal_dec * ratio
+        except (InvalidOperation, ZeroDivisionError):
+            principal_reduction = Decimal("0")
         # 插入交易记录
         self.session.execute(text("""
             INSERT INTO financial_transactions (
