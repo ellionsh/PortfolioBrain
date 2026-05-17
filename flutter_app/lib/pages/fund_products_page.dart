@@ -66,6 +66,8 @@ class _FundProductsPageState extends State<FundProductsPage> {
     return value.toStringAsFixed(fraction);
   }
 
+  String _formatNav(double? value) => _formatNumber(value, fraction: 4);
+
   String _formatPercent(double? value, {int fraction = 2}) {
     if (value == null) return '';
     return '${(value * 100).toStringAsFixed(fraction)}%';
@@ -226,9 +228,8 @@ class _FundProductsPageState extends State<FundProductsPage> {
                             if (previewName == null && previewNav == null) {
                               return const SizedBox.shrink();
                             }
-                            final navText = previewNav == null
-                                ? '-'
-                                : _formatNumber(previewNav);
+                            final navText =
+                                previewNav == null ? '-' : _formatNav(previewNav);
                             final dateText = (previewDate ?? '').trim();
                             return Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -715,7 +716,7 @@ class _FundProductsPageState extends State<FundProductsPage> {
                     [
                       row['fund_code'] ?? '',
                       if (principal != null) '成本 ${_formatNumber(principal)}',
-                      if (nav != null) '净值 ${_formatNumber(nav)}',
+                      if (nav != null) '净值 ${_formatNav(nav)}',
                       if (shares != null) '份额 ${_formatNumber(shares)}',
                       if (marketValue != null)
                         '市值 ${_formatNumber(marketValue)}',
