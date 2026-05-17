@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
@@ -117,107 +118,221 @@ class _FundProductsPageState extends State<FundProductsPage> {
     final remarkController = TextEditingController(text: fund?['remark'] ?? '');
 
     final isNew = fund == null;
+    Timer? debounceTimer;
+    String lastQuery = '';
+    String? previewName;
+    double? previewNav;
+    String? previewDate;
+    String? previewError;
+    bool previewLoading = false;
     final result = await showDialog<bool>(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: Text(isNew ? '新增基金产品' : '编辑基金产品'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                DropdownButtonFormField<int>(
-                  initialValue: selectedAccountId,
-                  items: accountChoices
-                      .map((entry) => DropdownMenuItem<int>(
-                            value: entry.key,
-                            child: Text(entry.value),
-                          ))
-                      .toList(),
-                  onChanged: (value) => selectedAccountId = value,
-                  decoration: const InputDecoration(labelText: '所属账户'),
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            Future<void> fetchPreview(String code) async {
+              final trimmed = code.trim();
+              lastQuery = trimmed;
+              debounceTimer?.cancel();
+              if (trimmed.isEmpty) {
+                setDialogState(() {
+                  previewName = null;
+                  previewNav = null;
+                  previewDate = null;
+                  previewError = null;
+                  previewLoading = false;
+                });
+                return;
+              }
+              debounceTimer = Timer(const Duration(milliseconds: 500), () async {
+                setDialogState(() {
+                  previewLoading = true;
+                  previewError = null;
+                });
+                try {
+                  final info = await ApiClient.getFundMeta(trimmed);
+                  if (lastQuery != trimmed) return;
+                  setDialogState(() {
+                    previewName = info['fund_name']?.toString();
+                    previewNav = _parseDouble(info['nav']);
+                    previewDate = info['nav_date']?.toString();
+                    previewError = info['error']?.toString();
+                    previewLoading = false;
+                  });
+                } catch (e) {
+                  if (lastQuery != trimmed) return;
+                  setDialogState(() {
+                    previewError = '获取基金信息失败';
+                    previewLoading = false;
+                  });
+                }
+              });
+            }
+
+            return AlertDialog(
+              title: Text(isNew ? '新增基金产品' : '编辑基金产品'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    DropdownButtonFormField<int>(
+                      initialValue: selectedAccountId,
+                      items: accountChoices
+                          .map((entry) => DropdownMenuItem<int>(
+                                value: entry.key,
+                                child: Text(entry.value),
+                              ))
+                          .toList(),
+                      onChanged: (value) => selectedAccountId = value,
+                      decoration: const InputDecoration(labelText: '所属账户'),
+                    ),
+                    TextField(
+                      controller: codeController,
+                      decoration: const InputDecoration(labelText: '基金代码'),
+                      onChanged: isNew ? fetchPreview : null,
+                    ),
+                    if (isNew)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8),
+                        child: Text(
+                          '基金名称与净值将自动从 AkShare 获取',
+                          style: TextStyle(color: Colors.black54, fontSize: 12),
+                        ),
+                      ),
+                    if (isNew)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Builder(
+                          builder: (context) {
+                            if (previewLoading) {
+                              return Row(
+                                children: const [
+                                  SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  ),
+                                  SizedBox(width: 8),
+                                  Text('正在获取基金信息...'),
+                                ],
+                              );
+                            }
+                            if (previewError != null) {
+                              return Text(
+                                previewError!,
+                                style: const TextStyle(color: Colors.redAccent),
+                              );
+                            }
+                            if (previewName == null && previewNav == null) {
+                              return const SizedBox.shrink();
+                            }
+                            final navText = previewNav == null
+                                ? '-'
+                                : _formatNumber(previewNav);
+                            final dateText = (previewDate ?? '').trim();
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('基金名称：${previewName ?? '-'}'),
+                                Text(
+                                  '基金净值：$navText'
+                                  '${dateText.isEmpty ? '' : '（$dateText）'}',
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ),
+                    if (!isNew) ...[
+                      TextField(
+                        controller: nameController,
+                        decoration: const InputDecoration(labelText: '基金名称'),
+                      ),
+                      TextField(
+                        controller: currencyController,
+                        decoration: const InputDecoration(labelText: '币种'),
+                      ),
+                      TextField(
+                        controller: sharesController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(labelText: '当前份额'),
+                      ),
+                      TextField(
+                        controller: navController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(labelText: '净值'),
+                      ),
+                      TextField(
+                        controller: principalController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(labelText: '成本'),
+                      ),
+                      TextField(
+                        controller: startController,
+                        decoration: const InputDecoration(
+                            labelText: '开始日期 (YYYY-MM-DD)'),
+                      ),
+                      TextField(
+                        controller: endController,
+                        decoration:
+                            const InputDecoration(labelText: '结束日期 (YYYY-MM-DD)'),
+                      ),
+                      TextField(
+                        controller: statusController,
+                        decoration: const InputDecoration(labelText: '状态'),
+                      ),
+                      TextField(
+                        controller: remarkController,
+                        decoration: const InputDecoration(labelText: '备注'),
+                      ),
+                    ],
+                  ],
                 ),
-                TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(labelText: '基金名称'),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('取消'),
                 ),
-                TextField(
-                  controller: codeController,
-                  decoration: const InputDecoration(labelText: '基金代码'),
-                ),
-                TextField(
-                  controller: currencyController,
-                  decoration: const InputDecoration(labelText: '币种'),
-                ),
-                TextField(
-                  controller: sharesController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: '当前份额'),
-                ),
-                TextField(
-                  controller: navController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: '净值'),
-                ),
-                TextField(
-                  controller: principalController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: '成本'),
-                ),
-                TextField(
-                  controller: startController,
-                  decoration:
-                      const InputDecoration(labelText: '开始日期 (YYYY-MM-DD)'),
-                ),
-                TextField(
-                  controller: endController,
-                  decoration:
-                      const InputDecoration(labelText: '结束日期 (YYYY-MM-DD)'),
-                ),
-                TextField(
-                  controller: statusController,
-                  decoration: const InputDecoration(labelText: '状态'),
-                ),
-                TextField(
-                  controller: remarkController,
-                  decoration: const InputDecoration(labelText: '备注'),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('取消'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
+                ElevatedButton(
+                  onPressed: () async {
+                final fundCode = codeController.text.trim();
+                final fundName = nameController.text.trim();
                 if (selectedAccountId == null ||
-                    nameController.text.trim().isEmpty) {
+                    fundCode.isEmpty ||
+                    (!isNew && fundName.isEmpty)) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('请填写基金名称和所属账户')),
+                    SnackBar(
+                      content: Text(
+                        isNew ? '请填写基金代码和所属账户' : '请填写基金名称、代码和所属账户',
+                      ),
+                    ),
                   );
                   return;
                 }
 
-                final params = {
+                final params = <String, dynamic>{
                   'account_id': selectedAccountId,
-                  'fund_name': nameController.text.trim(),
-                  'fund_code': codeController.text.trim(),
-                  'currency': currencyController.text.trim().isEmpty
-                      ? 'CNY'
-                      : currencyController.text.trim(),
-                  'shares': double.tryParse(sharesController.text) ?? 0,
-                  'nav': double.tryParse(navController.text),
-                  'principal':
-                      double.tryParse(principalController.text) ?? 0,
-                  'start_date': startController.text.trim(),
-                  'end_date': endController.text.trim(),
-                  'status': statusController.text.trim().isEmpty
-                      ? 'active'
-                      : statusController.text.trim(),
-                  'remark': remarkController.text.trim(),
+                  'fund_code': fundCode,
                 };
+                if (!isNew) {
+                  params.addAll({
+                    'fund_name': fundName,
+                    'currency': currencyController.text.trim().isEmpty
+                        ? 'CNY'
+                        : currencyController.text.trim(),
+                    'shares': double.tryParse(sharesController.text) ?? 0,
+                    'nav': double.tryParse(navController.text),
+                    'principal':
+                        double.tryParse(principalController.text) ?? 0,
+                    'start_date': startController.text.trim(),
+                    'end_date': endController.text.trim(),
+                    'status': statusController.text.trim().isEmpty
+                        ? 'active'
+                        : statusController.text.trim(),
+                    'remark': remarkController.text.trim(),
+                  });
+                }
 
                 final action =
                     isNew ? 'fund_product_create' : 'fund_product_update';
@@ -237,14 +352,17 @@ class _FundProductsPageState extends State<FundProductsPage> {
                 }
 
                 navigator.pop(true);
-              },
-              child: Text(isNew ? '新增' : '保存'),
-            ),
-          ],
+                  },
+                  child: Text(isNew ? '新增' : '保存'),
+                ),
+              ],
+            );
+          },
         );
       },
     );
 
+    debounceTimer?.cancel();
     if (result == true) {
       await _refresh();
     }

@@ -83,6 +83,17 @@ class ApiClient {
     }
   }
 
+  static Future<Map<String, dynamic>> getFundMeta(String fundCode) async {
+    final uri = Uri.parse('$baseUrl/fund_meta')
+        .replace(queryParameters: {'fund_code': fundCode});
+    final resp = await http.get(uri);
+    if (resp.statusCode == 200) {
+      return jsonDecode(resp.body) as Map<String, dynamic>;
+    } else {
+      throw Exception('Fund meta API error: ${resp.statusCode}');
+    }
+  }
+
   static Future<Map<String, dynamic>> getSummary() async {
     final resp = await http.get(Uri.parse('$baseUrl/summary'));
     if (resp.statusCode == 200) {

@@ -3,6 +3,7 @@
 import datetime
 
 from skills.operation_skill import OperationSkill
+from services.fund_nav_fetcher import FundNavFetcher
 def serialize(obj):
     if isinstance(obj, (datetime.date, datetime.datetime)):
         return obj.isoformat()
@@ -136,6 +137,26 @@ def get_fund_products():
     """, engine)
     data = df.to_dict(orient="records")
     return jsonify(serialize(data))
+
+@app.route("/fund_meta", methods=["GET"])
+def fund_meta():
+    code = request.args.get("fund_code", "").strip()
+    if not code:
+        return jsonify({"error": "缺少基金代码"}), 400
+    try:
+        name = FundNavFetcher.get_fund_name(code)
+        nav_info = FundNavFetcher.get_latest_nav(code)
+        nav = nav_info.get("nav") if isinstance(nav_info, dict) else None
+        date = nav_info.get("date") if isinstance(nav_info, dict) else None
+        if not name and nav is None:
+            return jsonify({"error": "无法获取基金信息"}), 404
+        return jsonify(serialize({
+            "fund_name": name,
+            "nav": nav,
+            "nav_date": date,
+        }))
+    except Exception as exc:
+        return jsonify({"error": f"获取基金信息失败: {exc}"}), 500
 
 @app.route("/financial_transactions", methods=["GET"])
 def get_financial_transactions():

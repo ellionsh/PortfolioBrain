@@ -1,5 +1,6 @@
 # skills/operation_skill.py
 from core.asset_operator import AssetOperator
+from services.fund_nav_fetcher import FundNavFetcher
 class OperationSkill:
     def __init__(self, session):
 
@@ -102,7 +103,34 @@ class OperationSkill:
             return self.op.sell("fund", **params)
 
         elif action == "fund_product_create":
-            return self.op.create_fund_product(**params)
+            fund_code = params.get("fund_code")
+            if not fund_code:
+                return {"error": "缺少基金代码"}
+
+            fund_name = params.get("fund_name")
+            if not fund_name or str(fund_name).strip() == "":
+                try:
+                    fund_name = FundNavFetcher.get_fund_name(fund_code)
+                except Exception as exc:
+                    return {"error": f"获取基金名称失败: {exc}"}
+                if not fund_name:
+                    return {"error": "无法获取基金名称"}
+
+            nav = params.get("nav")
+            if nav is None:
+                try:
+                    nav_info = FundNavFetcher.get_latest_nav(fund_code)
+                    nav = nav_info.get("nav")
+                except Exception as exc:
+                    return {"error": f"获取基金净值失败: {exc}"}
+                if nav is None:
+                    return {"error": "无法获取基金净值"}
+
+            new_params = dict(params)
+            new_params["fund_name"] = fund_name
+            if nav is not None:
+                new_params["nav"] = nav
+            return self.op.create_fund_product(**new_params)
 
         elif action == "fund_product_update":
             return self.op.update_fund_product(**params)
@@ -118,4 +146,3 @@ class OperationSkill:
         # ============================
         else:
             return {"error": f"未知操作：{action}"}
-
