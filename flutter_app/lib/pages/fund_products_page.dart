@@ -590,45 +590,53 @@ class _FundProductsPageState extends State<FundProductsPage> {
 
             return ListTile(
               title: Text(row['fund_name'] ?? '基金产品'),
-              subtitle: Text(
-                [
-                  row['fund_code'] ?? '',
-                  if (principal != null) '成本 ${_formatNumber(principal)}',
-                  if (nav != null) '净值 ${_formatNumber(nav)}',
-                  if (shares != null) '份额 ${_formatNumber(shares)}',
-                  if (marketValue != null) '市值 ${_formatNumber(marketValue)}',
-                  if (yieldRate != null) '收益率 ${_formatPercent(yieldRate)}',
-                  if (annualizedYield != null)
-                    '年化 ${_formatPercent(annualizedYield)}',
-                  if (_formatDateRange(row['start_date'], row['end_date'])
-                      .isNotEmpty)
-                    _formatDateRange(row['start_date'], row['end_date']),
-                ]
-                    .where((text) => text.toString().trim().isNotEmpty)
-                    .join(' · '),
-              ),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  IconButton(
-                    icon: const Icon(Icons.add_shopping_cart, size: 20),
-                    onPressed: () => _buyFund(row),
-                    tooltip: '买入',
+                  Text(
+                    [
+                      row['fund_code'] ?? '',
+                      if (principal != null) '成本 ${_formatNumber(principal)}',
+                      if (nav != null) '净值 ${_formatNumber(nav)}',
+                      if (shares != null) '份额 ${_formatNumber(shares)}',
+                      if (marketValue != null)
+                        '市值 ${_formatNumber(marketValue)}',
+                      if (yieldRate != null) '收益率 ${_formatPercent(yieldRate)}',
+                      if (annualizedYield != null)
+                        '年化 ${_formatPercent(annualizedYield)}',
+                      if (_formatDateRange(row['start_date'], row['end_date'])
+                          .isNotEmpty)
+                        _formatDateRange(row['start_date'], row['end_date']),
+                    ]
+                        .where((text) => text.toString().trim().isNotEmpty)
+                        .join(' · '),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.currency_exchange, size: 20),
-                    onPressed: () => _redeemFund(row),
-                    tooltip: '赎回',
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.edit, size: 20),
-                    onPressed: () => _showFundDialog(fund: row),
-                    tooltip: '编辑',
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.delete, size: 20),
-                    onPressed: () => _deleteFund(row),
-                    tooltip: '删除',
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 6,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.add_shopping_cart, size: 20),
+                        onPressed: () => _buyFund(row),
+                        tooltip: '买入',
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.currency_exchange, size: 20),
+                        onPressed: () => _redeemFund(row),
+                        tooltip: '赎回',
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.edit, size: 20),
+                        onPressed: () => _showFundDialog(fund: row),
+                        tooltip: '编辑',
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete, size: 20),
+                        onPressed: () => _deleteFund(row),
+                        tooltip: '删除',
+                      ),
+                    ],
                   ),
                 ],
               ),

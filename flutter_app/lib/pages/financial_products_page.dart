@@ -698,29 +698,55 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
 
             return ListTile(
               title: Text(m['product_name'] ?? '理财产品'),
-              subtitle: Text(
-                [
-                  m['type'] ?? '',
-                  m['product_code'] ?? '',
-                  if (principal != null) '成本 ${_formatNumber(principal)}',
-                  if (nav != null) '净值 ${_formatNumber(nav)}',
-                  if (shares != null) '份额 ${_formatNumber(shares)}',
-                  if (marketValue != null) '市值 ${_formatNumber(marketValue)}',
-                  if (yieldRate != null) '收益率 ${_formatPercent(yieldRate)}',
-                  if (annualizedYield != null) '年化 ${_formatPercent(annualizedYield)}',
-                  if (_formatDateRange(m['start_date'], m['end_date']).isNotEmpty)
-                    _formatDateRange(m['start_date'], m['end_date']),
-                ]
-                    .where((text) => text.toString().trim().isNotEmpty)
-                    .join(' · '),
-              ),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  IconButton(icon: const Icon(Icons.add_shopping_cart, size: 20), onPressed: () => _buyProduct(m), tooltip: '买入'),
-                  IconButton(icon: const Icon(Icons.currency_exchange, size: 20), onPressed: () => _redeemProduct(m), tooltip: '赎回'),
-                  IconButton(icon: const Icon(Icons.edit, size: 20), onPressed: () => _showProductDialog(product: m), tooltip: '编辑'),
-                  IconButton(icon: const Icon(Icons.delete, size: 20), onPressed: () => _deleteProduct(m), tooltip: '删除'),
+                  Text(
+                    [
+                      m['type'] ?? '',
+                      m['product_code'] ?? '',
+                      if (principal != null) '成本 ${_formatNumber(principal)}',
+                      if (nav != null) '净值 ${_formatNumber(nav)}',
+                      if (shares != null) '份额 ${_formatNumber(shares)}',
+                      if (marketValue != null)
+                        '市值 ${_formatNumber(marketValue)}',
+                      if (yieldRate != null) '收益率 ${_formatPercent(yieldRate)}',
+                      if (annualizedYield != null)
+                        '年化 ${_formatPercent(annualizedYield)}',
+                      if (_formatDateRange(m['start_date'], m['end_date'])
+                          .isNotEmpty)
+                        _formatDateRange(m['start_date'], m['end_date']),
+                    ]
+                        .where((text) => text.toString().trim().isNotEmpty)
+                        .join(' · '),
+                  ),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 6,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.add_shopping_cart, size: 20),
+                        onPressed: () => _buyProduct(m),
+                        tooltip: '买入',
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.currency_exchange, size: 20),
+                        onPressed: () => _redeemProduct(m),
+                        tooltip: '赎回',
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.edit, size: 20),
+                        onPressed: () => _showProductDialog(product: m),
+                        tooltip: '编辑',
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete, size: 20),
+                        onPressed: () => _deleteProduct(m),
+                        tooltip: '删除',
+                      ),
+                    ],
+                  ),
                 ],
               ),
             );
