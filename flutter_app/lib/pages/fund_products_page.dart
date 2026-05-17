@@ -244,49 +244,49 @@ class _FundProductsPageState extends State<FundProductsPage> {
                           },
                         ),
                       ),
-                    if (!isNew) ...[
-                      TextField(
-                        controller: nameController,
-                        decoration: const InputDecoration(labelText: '基金名称'),
-                      ),
-                      TextField(
-                        controller: currencyController,
-                        decoration: const InputDecoration(labelText: '币种'),
-                      ),
-                      TextField(
-                        controller: sharesController,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: '当前份额'),
-                      ),
+                    TextField(
+                      controller: currencyController,
+                      decoration: const InputDecoration(labelText: '币种'),
+                    ),
+                    TextField(
+                      controller: sharesController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: '当前份额'),
+                    ),
+                    if (!isNew)
                       TextField(
                         controller: navController,
                         keyboardType: TextInputType.number,
                         decoration: const InputDecoration(labelText: '净值'),
                       ),
+                    TextField(
+                      controller: principalController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: '成本'),
+                    ),
+                    TextField(
+                      controller: startController,
+                      decoration: const InputDecoration(
+                          labelText: '开始日期 (YYYY-MM-DD)'),
+                    ),
+                    TextField(
+                      controller: endController,
+                      decoration:
+                          const InputDecoration(labelText: '结束日期 (YYYY-MM-DD)'),
+                    ),
+                    TextField(
+                      controller: statusController,
+                      decoration: const InputDecoration(labelText: '状态'),
+                    ),
+                    TextField(
+                      controller: remarkController,
+                      decoration: const InputDecoration(labelText: '备注'),
+                    ),
+                    if (!isNew)
                       TextField(
-                        controller: principalController,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: '成本'),
+                        controller: nameController,
+                        decoration: const InputDecoration(labelText: '基金名称'),
                       ),
-                      TextField(
-                        controller: startController,
-                        decoration: const InputDecoration(
-                            labelText: '开始日期 (YYYY-MM-DD)'),
-                      ),
-                      TextField(
-                        controller: endController,
-                        decoration:
-                            const InputDecoration(labelText: '结束日期 (YYYY-MM-DD)'),
-                      ),
-                      TextField(
-                        controller: statusController,
-                        decoration: const InputDecoration(labelText: '状态'),
-                      ),
-                      TextField(
-                        controller: remarkController,
-                        decoration: const InputDecoration(labelText: '备注'),
-                      ),
-                    ],
                   ],
                 ),
               ),
@@ -315,23 +315,22 @@ class _FundProductsPageState extends State<FundProductsPage> {
                 final params = <String, dynamic>{
                   'account_id': selectedAccountId,
                   'fund_code': fundCode,
+                  'currency': currencyController.text.trim().isEmpty
+                      ? 'CNY'
+                      : currencyController.text.trim(),
+                  'shares': double.tryParse(sharesController.text) ?? 0,
+                  'principal': double.tryParse(principalController.text) ?? 0,
+                  'start_date': startController.text.trim(),
+                  'end_date': endController.text.trim(),
+                  'status': statusController.text.trim().isEmpty
+                      ? 'active'
+                      : statusController.text.trim(),
+                  'remark': remarkController.text.trim(),
                 };
                 if (!isNew) {
                   params.addAll({
                     'fund_name': fundName,
-                    'currency': currencyController.text.trim().isEmpty
-                        ? 'CNY'
-                        : currencyController.text.trim(),
-                    'shares': double.tryParse(sharesController.text) ?? 0,
                     'nav': double.tryParse(navController.text),
-                    'principal':
-                        double.tryParse(principalController.text) ?? 0,
-                    'start_date': startController.text.trim(),
-                    'end_date': endController.text.trim(),
-                    'status': statusController.text.trim().isEmpty
-                        ? 'active'
-                        : statusController.text.trim(),
-                    'remark': remarkController.text.trim(),
                   });
                 }
 
