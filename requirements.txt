@@ -8,3 +8,6 @@ openai
 schedule
 akshare
 PyJWT
+sqlalchemy
+flask_cors
+dotenv
