@@ -1,5 +1,7 @@
 .env
 .env.bak
+data
+*.bak
 portfolio.sock
 # Byte-compiled / optimized / DLL files
 __pycache__/
