@@ -47,9 +47,12 @@ class _LoginPageState extends State<LoginPage> {
         setState(() => _error = '登录失败：无效令牌');
         return;
       }
+      ApiClient.setToken(token);
       widget.onLoggedIn(token);
     } catch (e) {
-      setState(() => _error = '登录失败：$e');
+      final msg = e.toString();
+      final clean = msg.startsWith('Exception: ') ? msg.substring(11) : msg;
+      setState(() => _error = '登录失败：$clean');
     } finally {
       if (mounted) {
         setState(() => _loading = false);

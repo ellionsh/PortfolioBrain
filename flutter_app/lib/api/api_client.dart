@@ -31,6 +31,12 @@ class ApiClient {
     return headers;
   }
 
+  static void _throwApiError(String label, http.Response resp) {
+    final body = resp.body;
+    final suffix = body.isNotEmpty ? ' $body' : '';
+    throw Exception('$label API error: ${resp.statusCode}$suffix');
+  }
+
   static Future<Map<String, dynamic>> login(
       String username, String password) async {
     final resp = await http.post(
@@ -39,7 +45,12 @@ class ApiClient {
       body: jsonEncode({'username': username, 'password': password}),
     );
     if (resp.statusCode == 200) {
-      return jsonDecode(resp.body) as Map<String, dynamic>;
+      final data = jsonDecode(resp.body) as Map<String, dynamic>;
+      final token = data['access_token'] as String?;
+      if (token != null && token.isNotEmpty) {
+        _token = token;
+      }
+      return data;
     } else {
       final body = resp.body;
       throw Exception('Login failed: ${resp.statusCode} $body');
@@ -56,7 +67,7 @@ class ApiClient {
       final data = jsonDecode(resp.body);
       return data['response'] as String;
     } else {
-      throw Exception('Chat API error: ${resp.statusCode}');
+      _throwApiError('Chat', resp);
     }
   }
 
@@ -68,7 +79,7 @@ class ApiClient {
     if (resp.statusCode == 200) {
       return jsonDecode(resp.body) as List<dynamic>;
     } else {
-      throw Exception('Accounts API error');
+      _throwApiError('Accounts', resp);
     }
   }
 
@@ -80,7 +91,7 @@ class ApiClient {
     if (resp.statusCode == 200) {
       return jsonDecode(resp.body) as List<dynamic>;
     } else {
-      throw Exception('Bank deposits API error');
+      _throwApiError('Bank deposits', resp);
     }
   }
 
@@ -92,7 +103,7 @@ class ApiClient {
     if (resp.statusCode == 200) {
       return jsonDecode(resp.body) as List<dynamic>;
     } else {
-      throw Exception('Cashflows API error');
+      _throwApiError('Cashflows', resp);
     }
   }
 
@@ -104,7 +115,7 @@ class ApiClient {
     if (resp.statusCode == 200) {
       return jsonDecode(resp.body) as List<dynamic>;
     } else {
-      throw Exception('Insurance API error');
+      _throwApiError('Insurance', resp);
     }
   }
 
@@ -116,7 +127,7 @@ class ApiClient {
     if (resp.statusCode == 200) {
       return jsonDecode(resp.body) as List<dynamic>;
     } else {
-      throw Exception('Financial products API error');
+      _throwApiError('Financial products', resp);
     }
   }
 
@@ -128,7 +139,7 @@ class ApiClient {
     if (resp.statusCode == 200) {
       return jsonDecode(resp.body) as List<dynamic>;
     } else {
-      throw Exception('Fund products API error');
+      _throwApiError('Fund products', resp);
     }
   }
 
@@ -139,7 +150,7 @@ class ApiClient {
     if (resp.statusCode == 200) {
       return jsonDecode(resp.body) as Map<String, dynamic>;
     } else {
-      throw Exception('Fund meta API error: ${resp.statusCode}');
+      _throwApiError('Fund meta', resp);
     }
   }
 
@@ -151,7 +162,7 @@ class ApiClient {
     if (resp.statusCode == 200) {
       return jsonDecode(resp.body) as Map<String, dynamic>;
     } else {
-      throw Exception('Summary API error');
+      _throwApiError('Summary', resp);
     }
   }
 
@@ -164,7 +175,7 @@ class ApiClient {
     if (resp.statusCode == 200) {
       return jsonDecode(resp.body) as Map<String, dynamic>;
     } else {
-      throw Exception('Operate API error: ${resp.statusCode}');
+      _throwApiError('Operate', resp);
     }
   }
 }

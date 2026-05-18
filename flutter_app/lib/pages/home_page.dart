@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../api/api_client.dart';
+import '../utils/error_format.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -109,7 +110,7 @@ class _HomePageState extends State<HomePage> {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            return Center(child: Text('加载失败: ${snapshot.error}'));
+            return Center(child: Text('加载失败: ${formatApiError(snapshot.error!)}'));
           }
           final data = snapshot.data!;
           return Padding(
@@ -286,4 +287,3 @@ class _AccountAssetBreakdown {
     return parts.join(' · ');
   }
 }
-

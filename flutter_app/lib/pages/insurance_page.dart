@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../utils/error_format.dart';
 import '../api/api_client.dart';
 
 class InsurancePage extends StatefulWidget {
@@ -226,7 +228,9 @@ class _InsurancePageState extends State<InsurancePage> {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            return Center(child: Text('加载失败: ${snapshot.error}'));
+            return Center(
+              child: Text('加载失败: ${formatApiError(snapshot.error!)}'),
+            );
           }
           final data = snapshot.data ?? [];
           return Column(

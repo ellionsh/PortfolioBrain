@@ -102,6 +102,7 @@ User
   - `PB_REQUIRE_AUTH=true`（默认）
   - `PB_AUTH_EXPIRES_MINUTES=720`（可选）
   - `PB_ALLOW_REGISTER=true`（可选，允许注册）
+- 依赖注意：必须使用 `PyJWT` 包；若误装了 `jwt` 包会导致 `jwt.encode` 不存在（建议 `pip uninstall jwt` 后安装 `PyJWT`）
 - 登录获取 Token：`POST /login`（或启用注册：`POST /register`）
 - 在请求头携带：`Authorization: Bearer <token>`
 

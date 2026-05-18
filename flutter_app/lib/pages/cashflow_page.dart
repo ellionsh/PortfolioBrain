@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../utils/error_format.dart';
 import '../api/api_client.dart';
 
 class CashflowPage extends StatefulWidget {
@@ -23,12 +25,14 @@ class _CashflowPageState extends State<CashflowPage> {
       child: FutureBuilder<List<dynamic>>(
         future: _future,
         builder: (context, snapshot) {
-          if (snapshot.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(child: Text('加载失败: ${snapshot.error}'));
-          }
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(
+            child: Text('加载失败: ${formatApiError(snapshot.error!)}'),
+          );
+        }
           final data = snapshot.data ?? [];
           return ListView.builder(
             itemCount: data.length,

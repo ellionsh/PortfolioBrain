@@ -1,7 +1,7 @@
 import datetime
 from functools import wraps
 
-import jwt
+import jwt as _jwt
 from flask import request, jsonify, g
 from sqlalchemy import text
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -10,9 +10,26 @@ import config
 from db.db import get_engine
 
 
+def _get_jwt():
+    if not hasattr(_jwt, "encode") or not hasattr(_jwt, "decode"):
+        raise RuntimeError(
+            "PyJWT is required for auth tokens. "
+            "The installed 'jwt' package does not provide encode/decode. "
+            "Uninstall 'jwt' and install 'PyJWT'."
+        )
+    return _jwt
+
+
 def _require_secret():
     if config.REQUIRE_AUTH and not config.AUTH_SECRET:
         raise RuntimeError("PB_AUTH_SECRET is required when PB_REQUIRE_AUTH=true")
+
+
+def ensure_auth_ready():
+    if not config.REQUIRE_AUTH:
+        return
+    _require_secret()
+    _get_jwt()
 
 
 def _get_engine():
@@ -33,6 +50,7 @@ def auth_required(fn):
             return fn(*args, **kwargs)
 
         _require_secret()
+        jwt = _get_jwt()
         token = _parse_bearer_token()
         if not token:
             return jsonify({"error": "缺少认证令牌"}), 401
@@ -102,6 +120,7 @@ def create_user(username: str, password: str):
 
 def issue_token(user):
     _require_secret()
+    jwt = _get_jwt()
     now = datetime.datetime.utcnow()
     exp = now + datetime.timedelta(minutes=config.AUTH_EXPIRES_MINUTES)
     payload = {

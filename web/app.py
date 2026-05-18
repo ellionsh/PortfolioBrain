@@ -22,7 +22,7 @@ from agent.agent import agent_chat
 from core.asset_operator import AssetOperator
 from core.cashflow_engine import CashflowEngine
 from db.db import get_engine, get_session
-from web.auth import auth_required, authenticate_user, create_user, issue_token
+from web.auth import auth_required, authenticate_user, create_user, issue_token, ensure_auth_ready
 
 app = Flask(__name__)
 CORS(app)
@@ -30,6 +30,7 @@ CORS(app)
 # 必要的认证配置检查
 if config.REQUIRE_AUTH and not config.AUTH_SECRET:
     raise RuntimeError("PB_AUTH_SECRET is required when PB_REQUIRE_AUTH=true")
+ensure_auth_ready()
 
 # 全局 SQLAlchemy engine + session
 engine = get_engine()

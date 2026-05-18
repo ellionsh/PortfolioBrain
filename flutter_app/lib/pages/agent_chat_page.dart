@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import '../api/api_client.dart';
+import '../utils/error_format.dart';
 
 class AgentChatPage extends StatefulWidget {
   const AgentChatPage({super.key});
@@ -29,7 +30,9 @@ class _AgentChatPageState extends State<AgentChatPage> {
       });
     } catch (e) {
       setState(() {
-        _messages.add(_Message(role: 'assistant', content: '出错了：$e'));
+        _messages.add(
+          _Message(role: 'assistant', content: '出错了：${formatApiError(e)}'),
+        );
       });
     } finally {
       setState(() {

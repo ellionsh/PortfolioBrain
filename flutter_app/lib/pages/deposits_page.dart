@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../utils/error_format.dart';
 import '../api/api_client.dart';
 
 class DepositsPage extends StatefulWidget {
@@ -115,7 +117,6 @@ class _DepositsPageState extends State<DepositsPage> {
                   return;
                 }
 
-                final messenger = ScaffoldMessenger.of(context);
                 final navigator = Navigator.of(context);
                 final principal = double.tryParse(principalController.text) ?? 0;
                 final rate = (double.tryParse(rateController.text) ?? 0) / 100;
@@ -137,7 +138,7 @@ class _DepositsPageState extends State<DepositsPage> {
                 final response = await ApiClient.operate(action, params);
                 if (!mounted) return;
                 if (response.containsKey('error')) {
-                  messenger.showSnackBar(SnackBar(content: Text(response['error'].toString())));
+                  showErrorSnackBar(context, response['error']);
                   return;
                 }
 
@@ -157,7 +158,6 @@ class _DepositsPageState extends State<DepositsPage> {
 
   Future<void> _deleteDeposit(Map<String, dynamic> deposit) async {
     final dialogContext = context;
-    final messenger = ScaffoldMessenger.of(dialogContext);
     final confirmed = await showDialog<bool>(
       context: dialogContext,
       builder: (context) {
@@ -178,7 +178,7 @@ class _DepositsPageState extends State<DepositsPage> {
 
     final response = await ApiClient.operate('bank_deposit_delete', {'id': deposit['id']});
     if (response.containsKey('error')) {
-      messenger.showSnackBar(SnackBar(content: Text(response['error'].toString())));
+      showErrorSnackBar(context, response['error']);
       return;
     }
 
@@ -249,9 +249,7 @@ class _DepositsPageState extends State<DepositsPage> {
     if (!mounted) return;
     final messenger = ScaffoldMessenger.of(context);
     if (response.containsKey('error')) {
-      messenger.showSnackBar(
-        SnackBar(content: Text(response['error'].toString())),
-      );
+      showErrorSnackBar(context, response['error']);
       return;
     }
 
@@ -269,7 +267,9 @@ class _DepositsPageState extends State<DepositsPage> {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            return Center(child: Text('加载失败: ${snapshot.error}'));
+            return Center(
+              child: Text('加载失败: ${formatApiError(snapshot.error!)}'),
+            );
           }
 
           final data = snapshot.data!;

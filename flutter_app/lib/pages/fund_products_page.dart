@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
+import '../utils/error_format.dart';
+
 import '../api/api_client.dart';
 
 class FundProductsPage extends StatefulWidget {
@@ -164,7 +166,7 @@ class _FundProductsPageState extends State<FundProductsPage> {
                 } catch (e) {
                   if (lastQuery != trimmed) return;
                   setDialogState(() {
-                    previewError = '获取基金信息失败';
+                    previewError = formatApiError(e);
                     previewLoading = false;
                   });
                 }
@@ -345,9 +347,7 @@ class _FundProductsPageState extends State<FundProductsPage> {
                 final messenger = ScaffoldMessenger.of(context);
                 final navigator = Navigator.of(context);
                 if (response.containsKey('error')) {
-                  messenger.showSnackBar(
-                    SnackBar(content: Text(response['error'].toString())),
-                  );
+                  showErrorSnackBar(context, response['error']);
                   return;
                 }
 
@@ -399,9 +399,7 @@ class _FundProductsPageState extends State<FundProductsPage> {
         await ApiClient.operate('fund_product_delete', {'id': fund['id']});
     if (!context.mounted) return;
     if (response.containsKey('error')) {
-      messenger.showSnackBar(
-        SnackBar(content: Text(response['error'].toString())),
-      );
+      showErrorSnackBar(context, response['error']);
       return;
     }
 
@@ -505,9 +503,7 @@ class _FundProductsPageState extends State<FundProductsPage> {
     if (!mounted) return;
     final messenger = ScaffoldMessenger.of(context);
     if (response.containsKey('error')) {
-      messenger.showSnackBar(
-        SnackBar(content: Text(response['error'].toString())),
-      );
+      showErrorSnackBar(context, response['error']);
       return;
     }
 
@@ -632,7 +628,9 @@ class _FundProductsPageState extends State<FundProductsPage> {
           return const Center(child: CircularProgressIndicator());
         }
         if (snapshot.hasError) {
-          return Center(child: Text('加载失败: ${snapshot.error}'));
+          return Center(
+            child: Text('加载失败: ${formatApiError(snapshot.error!)}'),
+          );
         }
         final data = snapshot.data!;
         return Column(
