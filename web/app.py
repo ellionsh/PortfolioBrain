@@ -22,9 +22,14 @@ from agent.agent import agent_chat
 from core.asset_operator import AssetOperator
 from core.cashflow_engine import CashflowEngine
 from db.db import get_engine, get_session
+from web.auth import auth_required, authenticate_user, create_user, issue_token
 
 app = Flask(__name__)
 CORS(app)
+
+# 必要的认证配置检查
+if config.REQUIRE_AUTH and not config.AUTH_SECRET:
+    raise RuntimeError("PB_AUTH_SECRET is required when PB_REQUIRE_AUTH=true")
 
 # 全局 SQLAlchemy engine + session
 engine = get_engine()
@@ -53,17 +58,68 @@ def index():
         ]
     }
 
+
+@app.route("/login", methods=["POST"])
+def login():
+    data = request.json or {}
+    username = (data.get("username") or "").strip()
+    password = data.get("password") or ""
+    if not username or not password:
+        return jsonify({"error": "缺少用户名或密码"}), 400
+    user = authenticate_user(username, password)
+    if not user:
+        return jsonify({"error": "用户名或密码错误"}), 401
+    token = issue_token(user)
+    return jsonify({
+        "access_token": token,
+        "token_type": "Bearer",
+        "expires_in_minutes": config.AUTH_EXPIRES_MINUTES,
+        "user": user,
+    })
+
+
+@app.route("/register", methods=["POST"])
+def register():
+    if not config.ALLOW_REGISTER:
+        return jsonify({"error": "注册功能未开启"}), 403
+    data = request.json or {}
+    username = (data.get("username") or "").strip()
+    password = data.get("password") or ""
+    if not username or not password:
+        return jsonify({"error": "缺少用户名或密码"}), 400
+    if len(username) < 3 or len(password) < 6:
+        return jsonify({"error": "用户名至少3位，密码至少6位"}), 400
+    user = create_user(username, password)
+    if not user:
+        return jsonify({"error": "用户名已存在"}), 409
+    token = issue_token(user)
+    return jsonify({
+        "access_token": token,
+        "token_type": "Bearer",
+        "expires_in_minutes": config.AUTH_EXPIRES_MINUTES,
+        "user": user,
+    })
+
+
+@app.route("/me", methods=["GET"])
+@auth_required
+def me():
+    from flask import g
+    return jsonify({"user": g.current_user})
+
 # ============================
 # 1. Flutter API 接口（返回 JSON 数据）
 # ============================
 
 @app.route("/accounts", methods=["GET"])
+@auth_required
 def get_accounts():
     df = pd.read_sql("SELECT * FROM accounts ORDER BY id", engine)
     data = df.to_dict(orient="records")
     return jsonify(serialize(data))
 
 @app.route("/bank_deposits", methods=["GET"])
+@auth_required
 def get_bank_deposits():
     df = pd.read_sql("""
         SELECT id, account_id, deposit_type, principal, interest_rate,
@@ -75,6 +131,7 @@ def get_bank_deposits():
     return jsonify(serialize(data))
 
 @app.route("/cashflows", methods=["GET"])
+@auth_required
 def get_cashflows_api():
     df = pd.read_sql("""
         SELECT id, source_type, source_id, account_id,
@@ -86,6 +143,7 @@ def get_cashflows_api():
     return jsonify(serialize(data))
 
 @app.route("/insurance_products", methods=["GET"])
+@auth_required
 def get_insurance_products():
     df = pd.read_sql("""
         SELECT id, account_id, product_name, company, type,
@@ -99,6 +157,7 @@ def get_insurance_products():
     return jsonify(serialize(data))
 
 @app.route("/financial_products", methods=["GET"])
+@auth_required
 def get_financial_products():
     df = pd.read_sql("""
         SELECT fp.id, fp.account_id, fp.product_name, fp.product_code, fp.type,
@@ -120,6 +179,7 @@ def get_financial_products():
     return jsonify(serialize(data))
 
 @app.route("/fund_products", methods=["GET"])
+@auth_required
 def get_fund_products():
     df = pd.read_sql("""
         SELECT f.id, f.account_id, f.fund_name, f.fund_code, f.currency,
@@ -139,6 +199,7 @@ def get_fund_products():
     return jsonify(serialize(data))
 
 @app.route("/fund_meta", methods=["GET"])
+@auth_required
 def fund_meta():
     code = request.args.get("fund_code", "").strip()
     if not code:
@@ -159,6 +220,7 @@ def fund_meta():
         return jsonify({"error": f"获取基金信息失败: {exc}"}), 500
 
 @app.route("/financial_transactions", methods=["GET"])
+@auth_required
 def get_financial_transactions():
     df = pd.read_sql("""
         SELECT id, product_id, account_id, trade_date,
@@ -174,6 +236,7 @@ def get_financial_transactions():
 # 1. Agent 对话接口
 # ============================
 @app.route("/chat", methods=["POST"])
+@auth_required
 def chat():
     q = request.json.get("query", "")
     return jsonify({"response": agent_chat(q)})
@@ -183,6 +246,7 @@ def chat():
 # 2. 资产总览
 # ============================
 @app.route("/summary", methods=["GET"])
+@auth_required
 def summary():
     # 从视图中直接获取各类资产和总资产
     df_summary = pd.read_sql("SELECT * FROM asset_summary_view", engine)
@@ -219,6 +283,7 @@ def summary():
 # 3. 持仓列表
 # ============================
 @app.route("/positions", methods=["GET"])
+@auth_required
 def positions():
     df = pd.read_sql("""
         SELECT date, account_id, asset_code, shares, cost, market_value, currency
@@ -233,6 +298,7 @@ def positions():
 # 4. 未来现金流
 # ============================
 @app.route("/cashflows", methods=["GET"])
+@auth_required
 def cashflows():
     df = pd.read_sql("""
         SELECT date, amount, currency, direction, description
@@ -247,6 +313,7 @@ def cashflows():
 # 5. 理财产品列表
 # ============================
 @app.route("/products", methods=["GET"])
+@auth_required
 def products():
     df = pd.read_sql("""
         SELECT id, product_name, product_code, type, currency,
@@ -261,6 +328,7 @@ def products():
 # 6. 净值曲线
 # ============================
 @app.route("/nav/<product_code>", methods=["GET"])
+@auth_required
 def nav_curve(product_code):
     df = pd.read_sql("""
         SELECT date, nav
@@ -275,6 +343,7 @@ def nav_curve(product_code):
 # 7. 理财期限结构
 # ============================
 @app.route("/maturity", methods=["GET"])
+@auth_required
 def maturity():
     df = pd.read_sql("""
         SELECT product_name, start_date, end_date
@@ -288,6 +357,7 @@ def maturity():
 # 8. 资产操作接口（买入/卖出/更新净值）
 # ============================
 @app.route("/operate", methods=["POST"])
+@auth_required
 def operate():
     data = request.json
     action = data.get("action")
@@ -301,6 +371,7 @@ def operate():
 # 9. 重新生成现金流
 # ============================
 @app.route("/generate_cashflows", methods=["POST"])
+@auth_required
 def generate_cashflows():
     cf_engine.generate_all()
     return {"status": "success"}

@@ -92,6 +92,44 @@ User
 6. 启动移动端（可选）
     flutter run
 ```
+
+### 认证与安全（API）
+
+默认开启 Token 认证（适合公网部署）：
+
+- 设置环境变量：
+  - `PB_AUTH_SECRET`：JWT 密钥（务必设置为强随机字符串）
+  - `PB_REQUIRE_AUTH=true`（默认）
+  - `PB_AUTH_EXPIRES_MINUTES=720`（可选）
+  - `PB_ALLOW_REGISTER=true`（可选，允许注册）
+- 登录获取 Token：`POST /login`（或启用注册：`POST /register`）
+- 在请求头携带：`Authorization: Bearer <token>`
+
+管理员用户创建脚本（兼容保留，建议用统一 CLI）：
+
+- `python scripts/create_admin.py --username admin`
+
+用户管理脚本（兼容保留，建议用统一 CLI）：
+
+- `python scripts/manage_users.py list`
+- `python scripts/manage_users.py deactivate --username alice`
+- `python scripts/manage_users.py activate --username alice`
+- `python scripts/manage_users.py promote --username alice`
+- `python scripts/manage_users.py demote --username alice`
+
+重置密码脚本（兼容保留，建议用统一 CLI）：
+
+- `python scripts/reset_password.py --username alice`
+
+统一管理 CLI（推荐）：
+
+- `python scripts/admin_cli.py create-admin --username admin`
+- `python scripts/admin_cli.py list`
+- `python scripts/admin_cli.py deactivate --username alice`
+- `python scripts/admin_cli.py activate --username alice`
+- `python scripts/admin_cli.py promote --username alice`
+- `python scripts/admin_cli.py demote --username alice`
+- `python scripts/admin_cli.py reset-password --username alice`
 ## 目录结构
 
 ```text

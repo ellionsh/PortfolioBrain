@@ -8,6 +8,17 @@ CREATE DATABASE IF NOT EXISTS portfolio
 
 USE portfolio;
 
+-- 0. users（用户表）
+CREATE TABLE users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(100) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    is_admin BOOLEAN DEFAULT FALSE,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_login TIMESTAMP NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- 1. accounts（账户表）
 CREATE TABLE accounts (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -303,4 +314,3 @@ CREATE TABLE migration_logs (
     message TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-

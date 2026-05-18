@@ -28,3 +28,11 @@ API_HOST = os.getenv("PB_API_HOST", "0.0.0.0")
 API_PORT = int(os.getenv("PB_API_PORT", "5000"))
 DEBUG = os.getenv("PB_DEBUG", "true").lower() == "true"
 
+# ============================
+# Auth Configuration
+# ============================
+REQUIRE_AUTH = os.getenv("PB_REQUIRE_AUTH", "true").lower() == "true"
+ALLOW_REGISTER = os.getenv("PB_ALLOW_REGISTER", "false").lower() == "true"
+AUTH_SECRET = os.getenv("PB_AUTH_SECRET", "")
+AUTH_ALGORITHM = os.getenv("PB_AUTH_ALGORITHM", "HS256")
+AUTH_EXPIRES_MINUTES = int(os.getenv("PB_AUTH_EXPIRES_MINUTES", "720"))

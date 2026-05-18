@@ -7,3 +7,4 @@ pytest
 openai
 schedule
 akshare
+PyJWT
