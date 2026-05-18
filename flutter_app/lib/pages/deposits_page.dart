@@ -117,7 +117,8 @@ class _DepositsPageState extends State<DepositsPage> {
                   return;
                 }
 
-                final navigator = Navigator.of(context);
+                final dialogContext = context;
+                final navigator = Navigator.of(dialogContext);
                 final principal = double.tryParse(principalController.text) ?? 0;
                 final rate = (double.tryParse(rateController.text) ?? 0) / 100;
                 final params = {
@@ -136,9 +137,9 @@ class _DepositsPageState extends State<DepositsPage> {
                 }
 
                 final response = await ApiClient.operate(action, params);
-                if (!mounted) return;
+                if (!dialogContext.mounted) return;
                 if (response.containsKey('error')) {
-                  showErrorSnackBar(context, response['error']);
+                  showErrorSnackBar(dialogContext, response['error']);
                   return;
                 }
 
@@ -177,6 +178,7 @@ class _DepositsPageState extends State<DepositsPage> {
     }
 
     final response = await ApiClient.operate('bank_deposit_delete', {'id': deposit['id']});
+    if (!mounted) return;
     if (response.containsKey('error')) {
       showErrorSnackBar(context, response['error']);
       return;

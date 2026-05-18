@@ -31,7 +31,7 @@ class ApiClient {
     return headers;
   }
 
-  static void _throwApiError(String label, http.Response resp) {
+  static Never _throwApiError(String label, http.Response resp) {
     final body = resp.body;
     final suffix = body.isNotEmpty ? ' $body' : '';
     throw Exception('$label API error: ${resp.statusCode}$suffix');

@@ -344,10 +344,10 @@ class _FundProductsPageState extends State<FundProductsPage> {
 
                 final response = await ApiClient.operate(action, params);
                 if (!context.mounted) return;
-                final messenger = ScaffoldMessenger.of(context);
-                final navigator = Navigator.of(context);
+                final dialogContext = context;
+                final navigator = Navigator.of(dialogContext);
                 if (response.containsKey('error')) {
-                  showErrorSnackBar(context, response['error']);
+                  showErrorSnackBar(dialogContext, response['error']);
                   return;
                 }
 
@@ -394,12 +394,12 @@ class _FundProductsPageState extends State<FundProductsPage> {
     }
 
     if (!mounted) return;
-    final messenger = ScaffoldMessenger.of(context);
+    final safeContext = context;
     final response =
         await ApiClient.operate('fund_product_delete', {'id': fund['id']});
-    if (!context.mounted) return;
+    if (!safeContext.mounted) return;
     if (response.containsKey('error')) {
-      showErrorSnackBar(context, response['error']);
+      showErrorSnackBar(safeContext, response['error']);
       return;
     }
 
