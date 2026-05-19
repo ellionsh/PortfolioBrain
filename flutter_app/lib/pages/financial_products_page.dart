@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../utils/error_format.dart';
@@ -676,21 +675,24 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           children: items.map((m) {
+            final isNavProduct = _isNavProduct(m);
             final shares = _parseDouble(m['shares']);
             final nav = _parseDouble(m['nav']);
             final principal = _parseDouble(m['principal']);
-            final marketValue = (shares != null && nav != null) ? shares * nav : null;
+            double? marketValue;
+            if (isNavProduct) {
+              if (shares != null && nav != null) {
+                marketValue = shares * nav;
+              }
+            } else {
+              if (shares != null) {
+                marketValue = shares;
+              }
+            }
             final yieldRate = (marketValue != null && principal != null && principal > 0)
                 ? (marketValue - principal) / principal
                 : null;
-            final startDate = _parseDate(m['start_date']);
-            double? annualizedYield;
-            if (yieldRate != null && startDate != null && yieldRate > -1) {
-              final days = DateTime.now().difference(startDate).inDays;
-              if (days > 0) {
-                annualizedYield = math.pow(1 + yieldRate, 365 / days) - 1;
-              }
-            }
+            final annualizedYield = _parseDouble(m['annualized_yield']);
 
             return ListTile(
               title: Text(m['product_name'] ?? '理财产品'),

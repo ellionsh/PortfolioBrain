@@ -1,3 +1,4 @@
+import datetime
 from decimal import Decimal, InvalidOperation
 from sqlalchemy import text
 
@@ -80,6 +81,18 @@ class AssetOperator:
             ) VALUES (:pid, :aid, :date, 'buy', :shares, :amount, :nav, 'CNY')
         """), {"pid": product_id, "aid": account_id, "date": date,
             "shares": shares, "amount": amount, "nav": nav})
+        # 记录现金流
+        self.session.execute(text("""
+            INSERT INTO cashflows (
+                source_type, source_id, account_id, date,
+                amount, currency, direction, description
+            ) VALUES ('financial', :pid, :aid, :date, :amt, 'CNY', 'outflow', '净值型理财买入')
+        """), {
+            "pid": product_id,
+            "aid": account_id,
+            "date": date,
+            "amt": -amount,
+        })
         # 更新产品份额
         self.session.execute(text("""
             UPDATE financial_products
@@ -97,6 +110,7 @@ class AssetOperator:
         self.session.execute(text("""
             UPDATE financial_products
             SET principal = COALESCE(principal,0) + :p,
+                shares = COALESCE(shares,0) + :p,
                 start_date = COALESCE(start_date, :d),
                 status='active'
             WHERE id=:pid
@@ -104,6 +118,18 @@ class AssetOperator:
             "p": principal,
             "d": date,
             "pid": product_id
+        })
+        # 记录现金流
+        self.session.execute(text("""
+            INSERT INTO cashflows (
+                source_type, source_id, account_id, date,
+                amount, currency, direction, description
+            ) VALUES ('financial', :pid, :aid, :date, :amt, 'CNY', 'outflow', '固定收益理财买入')
+        """), {
+            "pid": product_id,
+            "aid": account_id,
+            "date": date,
+            "amt": -principal,
         })
 
         self.session.commit()
@@ -263,6 +289,18 @@ class AssetOperator:
             "principal_reduction": principal_reduction,
             "pid": product_id,
         })
+        # 记录现金流
+        self.session.execute(text("""
+            INSERT INTO cashflows (
+                source_type, source_id, account_id, date,
+                amount, currency, direction, description
+            ) VALUES ('financial', :pid, :aid, :date, :amt, 'CNY', 'inflow', '净值型理财赎回')
+        """), {
+            "pid": product_id,
+            "aid": account_id,
+            "date": date,
+            "amt": amount,
+        })
         self.session.commit()
         return {"status": "success", "amount": float(amount)}
 
@@ -271,7 +309,8 @@ class AssetOperator:
         self.session.execute(text("""
             UPDATE financial_products
             SET status='redeemed',
-                principal = COALESCE(principal,0) - :amount
+                principal = COALESCE(principal,0) - :amount,
+                shares = COALESCE(shares,0) - :amount
             WHERE id=:pid
         """), {"pid": product_id, "amount": amount})
 
@@ -522,6 +561,12 @@ class AssetOperator:
         status="active",
         remark=None,
     ):
+        if start_date == "":
+            start_date = None
+        if end_date == "":
+            end_date = None
+        if not is_nav_based and shares is None and principal is not None:
+            shares = principal
         self.session.execute(text("""
             INSERT INTO financial_products (
                 account_id, product_name, product_code, type, currency,
@@ -548,11 +593,30 @@ class AssetOperator:
             "expected_yield": expected_yield,
             "start_date": start_date,
             "end_date": end_date,
-            "pay_freq": pay_freq,
-            "status": status,
-            "remark": remark,
+                "pay_freq": pay_freq,
+                "status": status,
+                "remark": remark,
         })
         product_id = self.session.execute(text("SELECT LAST_INSERT_ID()")).scalar()
+        if principal is not None:
+            try:
+                principal_value = float(principal)
+            except (TypeError, ValueError):
+                principal_value = None
+            if principal_value is not None and principal_value > 0:
+                cashflow_date = start_date or datetime.date.today()
+                self.session.execute(text("""
+                    INSERT INTO cashflows (
+                        source_type, source_id, account_id, date,
+                        amount, currency, direction, description
+                    ) VALUES ('financial', :pid, :aid, :date, :amt, :currency, 'outflow', '理财产品新增')
+                """), {
+                    "pid": product_id,
+                    "aid": account_id,
+                    "date": cashflow_date,
+                    "amt": -principal_value,
+                    "currency": currency,
+                })
         if nav is not None:
             nav_exists = self.session.execute(text("""
                 SELECT 1

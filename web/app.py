@@ -4,6 +4,8 @@ import datetime
 
 from skills.operation_skill import OperationSkill
 from services.fund_nav_fetcher import FundNavFetcher
+from sqlalchemy import text
+
 def serialize(obj):
     if isinstance(obj, (datetime.date, datetime.datetime)):
         return obj.isoformat()
@@ -12,6 +14,63 @@ def serialize(obj):
     if isinstance(obj, list):
         return [serialize(v) for v in obj]
     return obj
+
+
+def _xnpv(rate, cashflows):
+    t0 = cashflows[0][0]
+    total = 0.0
+    for d, amt in cashflows:
+        days = (d - t0).days / 365
+        total += amt / ((1 + rate) ** days)
+    return total
+
+
+def _xirr(cashflows):
+    if len(cashflows) < 2:
+        return None
+    cashflows = sorted(cashflows, key=lambda x: x[0])
+    amounts = [amt for _, amt in cashflows]
+    if all(a >= 0 for a in amounts) or all(a <= 0 for a in amounts):
+        return None
+
+    guess = 0.1
+    for _ in range(100):
+        f = _xnpv(guess, cashflows)
+        if abs(f) < 1e-6:
+            return guess
+        t0 = cashflows[0][0]
+        df = 0.0
+        for d, amt in cashflows:
+            days = (d - t0).days / 365
+            df -= (days * amt) / ((1 + guess) ** (days + 1))
+        if df == 0:
+            break
+        guess = guess - f / df
+        if guess <= -0.999999:
+            guess = -0.999999
+
+    low, high = -0.9999, 10.0
+    f_low = _xnpv(low, cashflows)
+    f_high = _xnpv(high, cashflows)
+    if f_low == 0:
+        return low
+    if f_high == 0:
+        return high
+    if f_low * f_high > 0:
+        return None
+    mid = None
+    for _ in range(100):
+        mid = (low + high) / 2
+        f_mid = _xnpv(mid, cashflows)
+        if abs(f_mid) < 1e-6:
+            return mid
+        if f_low * f_mid < 0:
+            high = mid
+            f_high = f_mid
+        else:
+            low = mid
+            f_low = f_mid
+    return mid
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -177,6 +236,54 @@ def get_financial_products():
         ORDER BY fp.end_date IS NOT NULL, fp.end_date ASC, fp.id DESC
     """, engine)
     data = df.to_dict(orient="records")
+    if data:
+        product_ids = [row.get("id") for row in data if row.get("id") is not None]
+        cashflow_map = {pid: [] for pid in product_ids}
+        if product_ids:
+            placeholders = ", ".join([f":id{i}" for i in range(len(product_ids))])
+            params = {f"id{i}": product_ids[i] for i in range(len(product_ids))}
+            rows = session.execute(text(f"""
+                SELECT product_id, trade_date, trade_type, amount, fee
+                FROM financial_transactions
+                WHERE product_id IN ({placeholders})
+            """), params).fetchall()
+            for product_id, trade_date, trade_type, amount, fee in rows:
+                try:
+                    amount_value = float(amount) if amount is not None else 0.0
+                except (TypeError, ValueError):
+                    continue
+                fee_value = 0.0
+                if fee is not None:
+                    try:
+                        fee_value = float(fee)
+                    except (TypeError, ValueError):
+                        fee_value = 0.0
+                if trade_type == "buy":
+                    signed_amount = -abs(amount_value) - fee_value
+                else:
+                    signed_amount = abs(amount_value) - fee_value
+                cashflow_map.setdefault(product_id, []).append((trade_date, signed_amount))
+
+        today = datetime.date.today()
+        for row in data:
+            pid = row.get("id")
+            cashflows = list(cashflow_map.get(pid, []))
+            is_nav_based = row.get("is_nav_based") in (1, True) or row.get("type") == "nav"
+            shares = row.get("shares")
+            nav = row.get("nav")
+            market_value = None
+            try:
+                if is_nav_based:
+                    if shares is not None and nav is not None:
+                        market_value = float(shares) * float(nav)
+                else:
+                    if shares is not None:
+                        market_value = float(shares)
+            except (TypeError, ValueError):
+                market_value = None
+            if market_value is not None:
+                cashflows.append((today, market_value))
+            row["annualized_yield"] = _xirr(cashflows) if cashflows else None
     return jsonify(serialize(data))
 
 @app.route("/fund_products", methods=["GET"])
