@@ -166,7 +166,7 @@ def issue_token(user):
     now = datetime.datetime.utcnow()
     exp = now + datetime.timedelta(minutes=config.AUTH_EXPIRES_MINUTES)
     payload = {
-        "sub": user["id"],
+        "sub": str(user["id"]),
         "username": user["username"],
         "iat": int(now.timestamp()),
         "exp": int(exp.timestamp()),
