@@ -156,9 +156,13 @@ class _PortfolioBrainAppState extends State<PortfolioBrainApp> {
 
       home: _config.isConfigured
           ? (_token == null
-              ? LoginPage(
-                  onConfigRequested: () => _openServerConfig(context),
-                  onLoggedIn: (token) => _setToken(token),
+              ? Builder(
+                  builder: (context) {
+                    return LoginPage(
+                      onConfigRequested: () => _openServerConfig(context),
+                      onLoggedIn: (token) => _setToken(token),
+                    );
+                  },
                 )
               : Builder(
                   builder: (context) {
