@@ -58,7 +58,7 @@ CREATE TABLE financial_products (
     type VARCHAR(50),              -- nav/fixed/structured
     currency VARCHAR(10),
     is_nav_based BOOLEAN,
-    risk_level INT,
+    risk_level VARCHAR(50),
     min_redeem_unit DECIMAL(18,4),
     principal DECIMAL(18,2),       -- 成本
     shares DECIMAL(18,4),          -- 当前份额
@@ -181,7 +181,7 @@ CREATE TABLE assets (
     type VARCHAR(50),          -- equity/bond/fund/cash/alt/commodity
     currency VARCHAR(10),
     exchange VARCHAR(50),
-    risk_level INT,
+    risk_level VARCHAR(50),
     remark TEXT,
     INDEX idx_assets_type (type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

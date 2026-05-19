@@ -175,7 +175,6 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
                     ),
                     TextField(
                       controller: riskController,
-                      keyboardType: TextInputType.number,
                       decoration: const InputDecoration(labelText: '风险等级'),
                     ),
                     TextField(
@@ -243,6 +242,7 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
                       return;
                     }
 
+                    final riskLevelText = riskController.text.trim();
                     final params = {
                       'account_id': selectedAccountId,
                       'product_name': nameController.text.trim(),
@@ -252,7 +252,8 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
                           ? 'CNY'
                           : currencyController.text.trim(),
                       'is_nav_based': isNavBased,
-                      'risk_level': int.tryParse(riskController.text),
+                      'risk_level':
+                          riskLevelText.isEmpty ? null : riskLevelText,
                       'min_redeem_unit':
                           double.tryParse(minRedeemController.text),
                       'principal': double.tryParse(principalController.text),

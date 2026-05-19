@@ -550,6 +550,8 @@ class AssetOperator:
             start_date = None
         if end_date == "":
             end_date = None
+        if isinstance(risk_level, str) and risk_level.strip() == "":
+            risk_level = None
         if not is_nav_based and shares is None and principal is not None:
             shares = principal
         self.session.execute(text("""
@@ -636,6 +638,8 @@ class AssetOperator:
             kwargs["start_date"] = None
         if kwargs.get("end_date") == "":
             kwargs["end_date"] = None
+        if isinstance(kwargs.get("risk_level"), str) and kwargs["risk_level"].strip() == "":
+            kwargs["risk_level"] = None
         fields = []
         params = {"id": id}
         allowed_fields = [
