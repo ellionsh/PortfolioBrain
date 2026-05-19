@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'api/api_client.dart';
 import 'api/api_server_config.dart';
 import 'api/auth_storage.dart';
+import 'api/release_bootstrap.dart';
 
 import 'pages/home_page.dart';
 import 'pages/accounts_page.dart';
@@ -14,6 +15,8 @@ import 'pages/login_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  await ReleaseBootstrap.ensureCleanStart();
 
   final config = await ApiServerConfig.load();
   final token = await AuthStorage.loadToken();

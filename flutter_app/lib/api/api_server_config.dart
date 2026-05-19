@@ -63,4 +63,11 @@ class ApiServerConfig {
     await prefs.setString(_schemeKey, config.scheme);
     return config;
   }
+
+  static Future<void> clear() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_hostKey);
+    await prefs.remove(_portKey);
+    await prefs.remove(_schemeKey);
+  }
 }
