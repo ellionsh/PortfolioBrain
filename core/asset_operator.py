@@ -688,6 +688,8 @@ class AssetOperator:
                             end_date=None, status="active", remark=None):
         start_date = start_date or None
         end_date = end_date or None
+        if isinstance(remark, str) and remark.strip() == "":
+            remark = None
         self.session.execute(text("""
             INSERT INTO fund_products (
                 account_id, fund_name, fund_code, currency,
