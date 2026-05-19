@@ -81,18 +81,6 @@ class AssetOperator:
             ) VALUES (:pid, :aid, :date, 'buy', :shares, :amount, :nav, 'CNY')
         """), {"pid": product_id, "aid": account_id, "date": date,
             "shares": shares, "amount": amount, "nav": nav})
-        # 记录现金流
-        self.session.execute(text("""
-            INSERT INTO cashflows (
-                source_type, source_id, account_id, date,
-                amount, currency, direction, description
-            ) VALUES ('financial', :pid, :aid, :date, :amt, 'CNY', 'outflow', '净值型理财买入')
-        """), {
-            "pid": product_id,
-            "aid": account_id,
-            "date": date,
-            "amt": -amount,
-        })
         # 更新产品份额
         self.session.execute(text("""
             UPDATE financial_products
@@ -119,17 +107,17 @@ class AssetOperator:
             "d": date,
             "pid": product_id
         })
-        # 记录现金流
         self.session.execute(text("""
-            INSERT INTO cashflows (
-                source_type, source_id, account_id, date,
-                amount, currency, direction, description
-            ) VALUES ('financial', :pid, :aid, :date, :amt, 'CNY', 'outflow', '固定收益理财买入')
+            INSERT INTO financial_transactions (
+                product_id, account_id, trade_date, trade_type,
+                shares, amount, nav, currency
+            ) VALUES (:pid, :aid, :date, 'buy', :shares, :amount, NULL, 'CNY')
         """), {
             "pid": product_id,
             "aid": account_id,
             "date": date,
-            "amt": -principal,
+            "shares": principal,
+            "amount": principal,
         })
 
         self.session.commit()
@@ -289,18 +277,6 @@ class AssetOperator:
             "principal_reduction": principal_reduction,
             "pid": product_id,
         })
-        # 记录现金流
-        self.session.execute(text("""
-            INSERT INTO cashflows (
-                source_type, source_id, account_id, date,
-                amount, currency, direction, description
-            ) VALUES ('financial', :pid, :aid, :date, :amt, 'CNY', 'inflow', '净值型理财赎回')
-        """), {
-            "pid": product_id,
-            "aid": account_id,
-            "date": date,
-            "amt": amount,
-        })
         self.session.commit()
         return {"status": "success", "amount": float(amount)}
 
@@ -315,15 +291,16 @@ class AssetOperator:
         """), {"pid": product_id, "amount": amount})
 
         self.session.execute(text("""
-            INSERT INTO cashflows (
-                source_type, source_id, account_id, date,
-                amount, currency, direction, description
-            ) VALUES ('financial', :pid, :aid, :date, :amt, 'CNY', 'inflow', '固定收益理财兑付')
+            INSERT INTO financial_transactions (
+                product_id, account_id, trade_date, trade_type,
+                shares, amount, nav, currency
+            ) VALUES (:pid, :aid, :date, 'sell', :shares, :amount, NULL, 'CNY')
         """), {
             "pid": product_id,
             "aid": account_id,
             "date": date,
-            "amt": amount
+            "shares": amount,
+            "amount": amount,
         })
 
         self.session.commit()
@@ -604,17 +581,19 @@ class AssetOperator:
             except (TypeError, ValueError):
                 principal_value = None
             if principal_value is not None and principal_value > 0:
-                cashflow_date = start_date or datetime.date.today()
+                trade_date = start_date or datetime.date.today()
                 self.session.execute(text("""
-                    INSERT INTO cashflows (
-                        source_type, source_id, account_id, date,
-                        amount, currency, direction, description
-                    ) VALUES ('financial', :pid, :aid, :date, :amt, :currency, 'outflow', '理财产品新增')
+                    INSERT INTO financial_transactions (
+                        product_id, account_id, trade_date, trade_type,
+                        shares, amount, nav, currency
+                    ) VALUES (:pid, :aid, :date, 'buy', :shares, :amount, :nav, :currency)
                 """), {
                     "pid": product_id,
                     "aid": account_id,
-                    "date": cashflow_date,
-                    "amt": -principal_value,
+                    "date": trade_date,
+                    "shares": shares if shares is not None else principal_value,
+                    "amount": principal_value,
+                    "nav": nav,
                     "currency": currency,
                 })
         if nav is not None:
