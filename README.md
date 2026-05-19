@@ -106,6 +106,11 @@ User
 - 登录获取 Token：`POST /login`（或启用注册：`POST /register`）
 - 在请求头携带：`Authorization: Bearer <token>`
 
+### 任务配置（可选）
+
+- `PB_FUND_NAV_RETRY_ATTEMPTS`：基金净值获取失败时的重试次数（默认 3）
+- `PB_FUND_NAV_RETRY_BASE_SECONDS`：每次重试的基础等待秒数（默认 2，实际等待=基础秒数×第几次重试）
+
 管理员用户创建脚本（兼容保留，建议用统一 CLI）：
 
 - `python scripts/create_admin.py --username admin`

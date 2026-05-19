@@ -36,3 +36,9 @@ ALLOW_REGISTER = os.getenv("PB_ALLOW_REGISTER", "false").lower() == "true"
 AUTH_SECRET = os.getenv("PB_AUTH_SECRET", "")
 AUTH_ALGORITHM = os.getenv("PB_AUTH_ALGORITHM", "HS256")
 AUTH_EXPIRES_MINUTES = int(os.getenv("PB_AUTH_EXPIRES_MINUTES", "720"))
+
+# ============================
+# Task Configuration
+# ============================
+FUND_NAV_RETRY_ATTEMPTS = int(os.getenv("PB_FUND_NAV_RETRY_ATTEMPTS", "3"))
+FUND_NAV_RETRY_BASE_SECONDS = float(os.getenv("PB_FUND_NAV_RETRY_BASE_SECONDS", "2"))
