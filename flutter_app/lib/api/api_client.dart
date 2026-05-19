@@ -35,8 +35,22 @@ class ApiClient {
     return utf8.decode(resp.bodyBytes);
   }
 
+  static String _prettyErrorBody(String body) {
+    if (body.isEmpty) return body;
+    try {
+      final decoded = jsonDecode(body);
+      if (decoded is Map && decoded['error'] is String) {
+        return decoded['error'] as String;
+      }
+      if (decoded is String) {
+        return decoded;
+      }
+    } catch (_) {}
+    return body;
+  }
+
   static Never _throwApiError(String label, http.Response resp) {
-    final body = _readBody(resp);
+    final body = _prettyErrorBody(_readBody(resp));
     final suffix = body.isNotEmpty ? ' $body' : '';
     throw Exception('$label API error: ${resp.statusCode}$suffix');
   }
@@ -56,7 +70,7 @@ class ApiClient {
       }
       return data;
     } else {
-      final body = _readBody(resp);
+      final body = _prettyErrorBody(_readBody(resp));
       throw Exception('Login failed: ${resp.statusCode} $body');
     }
   }
