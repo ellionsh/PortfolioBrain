@@ -61,6 +61,10 @@ def _token_preview(token: str | None) -> str:
     return f"{token[:8]}...{token[-4:]}"
 
 
+def _safe_len(value: str | None) -> int:
+    return len(value) if value else 0
+
+
 def auth_required(fn):
     @wraps(fn)
     def wrapper(*args, **kwargs):
@@ -91,11 +95,15 @@ def auth_required(fn):
                 _token_preview(token),
             )
             return jsonify({"error": "认证令牌已过期"}), 401
-        except jwt.InvalidTokenError:
+        except jwt.InvalidTokenError as exc:
             logger.warning(
-                "Auth token invalid path=%s token=%s",
+                "Auth token invalid path=%s token=%s alg=%s auth_len=%s token_len=%s err=%s",
                 request.path,
                 _token_preview(token),
+                config.AUTH_ALGORITHM,
+                _safe_len(auth_header),
+                _safe_len(token),
+                f"{exc.__class__.__name__}: {exc}",
             )
             return jsonify({"error": "认证令牌无效"}), 401
 
