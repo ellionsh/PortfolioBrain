@@ -304,6 +304,50 @@ def get_fund_products():
         ORDER BY f.end_date IS NOT NULL, f.end_date ASC, f.id DESC
     """, engine)
     data = df.to_dict(orient="records")
+    fund_ids = [row.get("id") for row in data if row.get("id") is not None]
+    cashflow_map = {fid: [] for fid in fund_ids}
+    if fund_ids:
+        placeholders = ", ".join([f":id{i}" for i in range(len(fund_ids))])
+        params = {f"id{i}": fund_ids[i] for i in range(len(fund_ids))}
+        rows = session.execute(text(f"""
+            SELECT fund_id, trade_date, trade_type, amount, fee
+            FROM fund_transactions
+            WHERE fund_id IN ({placeholders})
+        """), params).fetchall()
+        for fund_id, trade_date, trade_type, amount, fee in rows:
+            if trade_date is None:
+                continue
+            try:
+                amount_value = float(amount) if amount is not None else 0.0
+            except (TypeError, ValueError):
+                continue
+            fee_value = 0.0
+            if fee is not None:
+                try:
+                    fee_value = float(fee)
+                except (TypeError, ValueError):
+                    fee_value = 0.0
+            if trade_type == "buy":
+                signed_amount = -abs(amount_value) - fee_value
+            else:
+                signed_amount = abs(amount_value) - fee_value
+            cashflow_map.setdefault(fund_id, []).append((trade_date, signed_amount))
+
+    today = datetime.date.today()
+    for row in data:
+        fid = row.get("id")
+        cashflows = list(cashflow_map.get(fid, []))
+        shares = row.get("shares")
+        nav = row.get("nav")
+        market_value = None
+        try:
+            if shares is not None and nav is not None:
+                market_value = float(shares) * float(nav)
+        except (TypeError, ValueError):
+            market_value = None
+        if market_value is not None:
+            cashflows.append((today, market_value))
+        row["annualized_yield"] = _xirr(cashflows) if cashflows else None
     return jsonify(serialize(data))
 
 @app.route("/fund_meta", methods=["GET"])

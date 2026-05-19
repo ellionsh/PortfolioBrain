@@ -123,20 +123,28 @@ class AssetOperator:
         self.session.commit()
         return {"status": "success"}
 
-    def _buy_fund(self, fund_id, account_id, amount, nav, date):
-        shares = amount / nav
+    def _buy_fund(self, fund_id, account_id, amount, nav, date, shares=None):
+        amount_dec = Decimal(str(amount))
+        nav_dec = Decimal(str(nav))
+        fee = Decimal("0")
+        if shares is None:
+            shares = amount_dec / nav_dec
+        else:
+            shares = Decimal(str(shares))
+            fee = amount_dec - (shares * nav_dec)
         self.session.execute(text("""
             INSERT INTO fund_transactions (
                 fund_id, account_id, trade_date, trade_type,
-                shares, amount, nav, currency
-            ) VALUES (:fid, :aid, :date, 'buy', :shares, :amount, :nav, 'CNY')
+                shares, amount, nav, fee, currency
+            ) VALUES (:fid, :aid, :date, 'buy', :shares, :amount, :nav, :fee, 'CNY')
         """), {
             "fid": fund_id,
             "aid": account_id,
             "date": date,
             "shares": shares,
-            "amount": amount,
-            "nav": nav,
+            "amount": amount_dec,
+            "nav": nav_dec,
+            "fee": fee,
         })
         self.session.execute(text("""
             UPDATE fund_products
@@ -147,7 +155,7 @@ class AssetOperator:
             WHERE id=:fid
         """), {
             "shares": shares,
-            "amount": amount,
+            "amount": amount_dec,
             "date": date,
             "fid": fund_id,
         })
@@ -693,6 +701,40 @@ class AssetOperator:
                "start_date": start_date, "end_date": end_date,
                "status": status, "remark": remark})
         fund_id = self.session.execute(text("SELECT LAST_INSERT_ID()")).scalar()
+        if principal is not None:
+            try:
+                principal_value = float(principal)
+            except (TypeError, ValueError):
+                principal_value = None
+            if principal_value is not None and principal_value > 0:
+                trade_date = start_date or datetime.date.today()
+                shares_value = shares if shares not in (None, "", 0) else None
+                fee_value = Decimal("0")
+                if shares_value is None and nav not in (None, "", 0):
+                    try:
+                        shares_value = Decimal(str(principal_value)) / Decimal(str(nav))
+                    except (InvalidOperation, ZeroDivisionError):
+                        shares_value = None
+                if shares_value is not None and nav not in (None, ""):
+                    try:
+                        fee_value = Decimal(str(principal_value)) - (Decimal(str(shares_value)) * Decimal(str(nav)))
+                    except (InvalidOperation, ZeroDivisionError):
+                        fee_value = Decimal("0")
+                self.session.execute(text("""
+                    INSERT INTO fund_transactions (
+                        fund_id, account_id, trade_date, trade_type,
+                        shares, amount, nav, fee, currency
+                    ) VALUES (:fid, :aid, :date, 'buy', :shares, :amount, :nav, :fee, :currency)
+                """), {
+                    "fid": fund_id,
+                    "aid": account_id,
+                    "date": trade_date,
+                    "shares": shares_value,
+                    "amount": principal_value,
+                    "nav": nav,
+                    "fee": fee_value,
+                    "currency": currency,
+                })
         if nav is not None:
             nav_exists = self.session.execute(text("""
                 SELECT 1

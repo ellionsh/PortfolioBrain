@@ -408,6 +408,7 @@ class _FundProductsPageState extends State<FundProductsPage> {
 
   Future<void> _buyFund(Map<String, dynamic> fund) async {
     final amountController = TextEditingController();
+    final sharesController = TextEditingController();
     final navController =
         TextEditingController(text: fund['nav']?.toString() ?? '');
     final dateController = TextEditingController(text: _today());
@@ -426,6 +427,15 @@ class _FundProductsPageState extends State<FundProductsPage> {
                   keyboardType: TextInputType.number,
                   decoration: const InputDecoration(
                     labelText: '买入金额',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: sharesController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: '买入份额（可选）',
                     border: OutlineInputBorder(),
                   ),
                 ),
@@ -458,9 +468,18 @@ class _FundProductsPageState extends State<FundProductsPage> {
               onPressed: () {
                 final amount = double.tryParse(amountController.text);
                 final nav = double.tryParse(navController.text);
+                final sharesText = sharesController.text.trim();
+                final shares =
+                    sharesText.isEmpty ? null : double.tryParse(sharesText);
                 if (amount == null || amount <= 0 || nav == null || nav <= 0) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('请填写有效的买入金额和净值')),
+                  );
+                  return;
+                }
+                if (sharesText.isNotEmpty && (shares == null || shares <= 0)) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('请填写有效的买入份额')),
                   );
                   return;
                 }
@@ -474,9 +493,12 @@ class _FundProductsPageState extends State<FundProductsPage> {
     );
 
     final amount = double.tryParse(amountController.text);
+    final sharesText = sharesController.text.trim();
+    final shares = sharesText.isEmpty ? null : double.tryParse(sharesText);
     final nav = double.tryParse(navController.text);
     final date = dateController.text.trim();
     amountController.dispose();
+    sharesController.dispose();
     navController.dispose();
     dateController.dispose();
 
@@ -493,13 +515,17 @@ class _FundProductsPageState extends State<FundProductsPage> {
       return;
     }
 
-    final response = await ApiClient.operate('fund_buy', {
+    final request = <String, dynamic>{
       'fund_id': fund['id'],
       'account_id': accountId,
       'amount': amount,
       'nav': nav,
       'date': date,
-    });
+    };
+    if (shares != null) {
+      request['shares'] = shares;
+    }
+    final response = await ApiClient.operate('fund_buy', request);
     if (!mounted) return;
     final messenger = ScaffoldMessenger.of(context);
     if (response.containsKey('error')) {
