@@ -1,4 +1,5 @@
 import datetime
+import logging
 from functools import wraps
 
 import jwt as _jwt
@@ -8,6 +9,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 import config
 from db.db import get_engine
+
+logger = logging.getLogger(__name__)
 
 
 def _get_jwt():
@@ -23,6 +26,13 @@ def _get_jwt():
 def _require_secret():
     if config.REQUIRE_AUTH and not config.AUTH_SECRET:
         raise RuntimeError("PB_AUTH_SECRET is required when PB_REQUIRE_AUTH=true")
+    if config.REQUIRE_AUTH:
+        algo = (config.AUTH_ALGORITHM or "").upper()
+        if algo.startswith("HS") and len(config.AUTH_SECRET) < 32:
+            raise RuntimeError(
+                "PB_AUTH_SECRET is too short for HMAC. "
+                "Use at least 32 characters for HS* algorithms."
+            )
 
 
 def ensure_auth_ready():
@@ -43,6 +53,14 @@ def _parse_bearer_token():
     return auth_header.split(" ", 1)[1].strip()
 
 
+def _token_preview(token: str | None) -> str:
+    if not token:
+        return ""
+    if len(token) <= 12:
+        return token
+    return f"{token[:8]}...{token[-4:]}"
+
+
 def auth_required(fn):
     @wraps(fn)
     def wrapper(*args, **kwargs):
@@ -51,8 +69,14 @@ def auth_required(fn):
 
         _require_secret()
         jwt = _get_jwt()
+        auth_header = request.headers.get("Authorization", "")
         token = _parse_bearer_token()
         if not token:
+            logger.warning(
+                "Auth missing token path=%s auth_header=%s",
+                request.path,
+                auth_header,
+            )
             return jsonify({"error": "缺少认证令牌"}), 401
         try:
             payload = jwt.decode(
@@ -61,8 +85,18 @@ def auth_required(fn):
                 algorithms=[config.AUTH_ALGORITHM],
             )
         except jwt.ExpiredSignatureError:
+            logger.warning(
+                "Auth token expired path=%s token=%s",
+                request.path,
+                _token_preview(token),
+            )
             return jsonify({"error": "认证令牌已过期"}), 401
         except jwt.InvalidTokenError:
+            logger.warning(
+                "Auth token invalid path=%s token=%s",
+                request.path,
+                _token_preview(token),
+            )
             return jsonify({"error": "认证令牌无效"}), 401
 
         g.current_user = {
