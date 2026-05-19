@@ -1,12 +1,23 @@
 # web/app.py
 
 import datetime
+import math
 
+import pandas as pd
 from skills.operation_skill import OperationSkill
 from services.fund_nav_fetcher import FundNavFetcher
 from sqlalchemy import text
 
 def serialize(obj):
+    if obj is None:
+        return None
+    try:
+        if pd.isna(obj):
+            return None
+    except Exception:
+        pass
+    if isinstance(obj, float) and math.isnan(obj):
+        return None
     if isinstance(obj, (datetime.date, datetime.datetime)):
         return obj.isoformat()
     if isinstance(obj, dict):
@@ -74,7 +85,6 @@ def _xirr(cashflows):
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import pandas as pd
 import config
 
 from agent.agent import agent_chat
