@@ -31,6 +31,23 @@ class AssetOperator:
             {"id": fund_id},
         ).scalar()
 
+    def _upsert_fund_nav_by_code(self, fund_code, date, nav):
+        exists = self.session.execute(
+            text("SELECT 1 FROM fund_navs WHERE fund_code=:fcode LIMIT 1"),
+            {"fcode": fund_code},
+        ).scalar()
+        if exists:
+            self.session.execute(text("""
+                UPDATE fund_navs
+                SET date=:date, nav=:nav, currency='CNY'
+                WHERE fund_code=:fcode
+            """), {"fcode": fund_code, "date": date, "nav": nav})
+        else:
+            self.session.execute(text("""
+                INSERT INTO fund_navs (fund_code, date, nav, currency)
+                VALUES (:fcode, :date, :nav, 'CNY')
+            """), {"fcode": fund_code, "date": date, "nav": nav})
+
     # ============================
     # 1. 买入（Buy）
     # ============================
@@ -124,11 +141,7 @@ class AssetOperator:
         if not fund_code:
             self.session.rollback()
             return {"error": "找不到基金代码"}
-        self.session.execute(text("""
-            INSERT INTO fund_navs (fund_code, date, nav, currency)
-            VALUES (:fcode, :date, :nav, 'CNY')
-            ON DUPLICATE KEY UPDATE nav=:nav
-        """), {"fcode": fund_code, "date": date, "nav": nav})
+        self._upsert_fund_nav_by_code(fund_code, date, nav)
         self.session.commit()
         return {"status": "success", "shares": float(shares)}
 
@@ -330,11 +343,7 @@ class AssetOperator:
         if not fund_code:
             self.session.rollback()
             return {"error": "找不到基金代码"}
-        self.session.execute(text("""
-            INSERT INTO fund_navs (fund_code, date, nav, currency)
-            VALUES (:fcode, :date, :nav, 'CNY')
-            ON DUPLICATE KEY UPDATE nav=:nav
-        """), {"fcode": fund_code, "date": date, "nav": nav})
+        self._upsert_fund_nav_by_code(fund_code, date, nav)
         self.session.commit()
         return {"status": "success", "amount": float(amount)}
 
@@ -383,11 +392,7 @@ class AssetOperator:
             fund_code = self._get_fund_code(fund_id)
         if not fund_code:
             return {"error": "找不到基金代码"}
-        self.session.execute(text("""
-            INSERT INTO fund_navs (fund_code, date, nav, currency)
-            VALUES (:fcode, :date, :nav, 'CNY')
-            ON DUPLICATE KEY UPDATE nav=:nav
-        """), {"fcode": fund_code, "date": date, "nav": nav})
+        self._upsert_fund_nav_by_code(fund_code, date, nav)
         self.session.commit()
         return {"status": "success"}
 
