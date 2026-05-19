@@ -624,6 +624,10 @@ class AssetOperator:
     def update_financial_product(self, id, **kwargs):
         nav = kwargs.pop("nav", None)
         currency = kwargs.get("currency", "CNY")
+        if kwargs.get("start_date") == "":
+            kwargs["start_date"] = None
+        if kwargs.get("end_date") == "":
+            kwargs["end_date"] = None
         fields = []
         params = {"id": id}
         allowed_fields = [
