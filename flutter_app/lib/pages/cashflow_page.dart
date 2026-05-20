@@ -33,7 +33,28 @@ class _CashflowPageState extends State<CashflowPage> {
             child: Text('加载失败: ${formatApiError(snapshot.error!)}'),
           );
         }
-          final data = snapshot.data ?? [];
+          final rawData = snapshot.data ?? [];
+          final now = DateTime.now();
+          final today = DateTime(now.year, now.month, now.day);
+          final data = rawData
+              .whereType<Map<String, dynamic>>()
+              .where((row) {
+                final dateStr = row['date'];
+                if (dateStr == null) return false;
+                final date = DateTime.tryParse(dateStr.toString());
+                if (date == null) return false;
+                final dateOnly = DateTime(date.year, date.month, date.day);
+                return !dateOnly.isBefore(today);
+              })
+              .toList()
+            ..sort((a, b) {
+              final aDate = DateTime.tryParse(a['date'].toString());
+              final bDate = DateTime.tryParse(b['date'].toString());
+              if (aDate == null && bDate == null) return 0;
+              if (aDate == null) return 1;
+              if (bDate == null) return -1;
+              return aDate.compareTo(bDate);
+            });
           return ListView.builder(
             itemCount: data.length,
             itemBuilder: (context, i) {

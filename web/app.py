@@ -198,11 +198,12 @@ def get_bank_deposits():
 def get_cashflows_api():
     with session_scope() as session:
         df = pd.read_sql(text("""
-        SELECT id, source_type, source_id, account_id,
-               date, amount, currency, direction, description
-        FROM cashflows
-        ORDER BY date DESC
-    """), session.bind)
+            SELECT id, source_type, source_id, account_id,
+                   date, amount, currency, direction, description
+            FROM cashflows
+            WHERE date >= CURDATE()
+            ORDER BY date
+        """), session.bind)
         data = df.to_dict(orient="records")
         return jsonify(serialize(data))
 
