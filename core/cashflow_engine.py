@@ -24,6 +24,7 @@ class CashflowEngine:
             self.generate_bank_deposit()
             self.generate_fixed_financial()
             self.generate_nav_financial()
+            self.generate_fund()
             self.generate_insurance()
             if dry_run:
                 self.session.rollback()
@@ -251,3 +252,73 @@ class CashflowEngine:
                     })
 
                 d += delta
+
+    # ============================
+    # 5. 基金现金流（申购/赎回/分红/费用）
+    # ============================
+    def generate_fund(self):
+        rows = self.session.execute(text("""
+            SELECT id, fund_id, account_id, trade_date, trade_type,
+                   amount, fee, currency
+            FROM fund_transactions
+        """)).fetchall()
+
+        for tx_id, fund_id, account_id, date, ttype, amount, fee, currency in rows:
+            if date is None:
+                continue
+            exists = self.session.execute(text("""
+                SELECT COUNT(*) FROM cashflows
+                WHERE source_type='fund'
+                AND source_id=:id
+            """), {"id": tx_id}).scalar()
+
+            if exists > 0:
+                continue
+
+            try:
+                amount_value = float(amount) if amount is not None else 0.0
+            except (TypeError, ValueError):
+                amount_value = 0.0
+            try:
+                fee_value = float(fee) if fee is not None else 0.0
+            except (TypeError, ValueError):
+                fee_value = 0.0
+
+            total = None
+            direction = None
+            description = None
+
+            if ttype == "buy":
+                total = -abs(amount_value) - fee_value
+                direction = "outflow"
+                description = "基金申购"
+            elif ttype == "sell":
+                total = abs(amount_value) - fee_value
+                direction = "inflow"
+                description = "基金赎回"
+            elif ttype == "dividend":
+                total = abs(amount_value) - fee_value
+                direction = "inflow"
+                description = "基金分红"
+            elif ttype == "fee":
+                total = -abs(amount_value) - fee_value
+                direction = "outflow"
+                description = "基金费用"
+
+            if total is None:
+                continue
+
+            self.session.execute(text("""
+                INSERT INTO cashflows (
+                    source_type, source_id, account_id, date,
+                    amount, currency, direction, description
+                ) VALUES ('fund', :id, :aid, :d, :amt, :cur, :dir, :desc)
+            """), {
+                "id": tx_id,
+                "aid": account_id,
+                "d": date,
+                "amt": total,
+                "cur": currency or "CNY",
+                "dir": direction,
+                "desc": description
+            })
