@@ -1,5 +1,5 @@
-name: portfolio_brain_app
-description: PortfolioBrain mobile client
+name: 智能资产管理
+description: 智能资产管理移动客户端
 
 environment:
   sdk: ">=3.0.0 <4.0.0"

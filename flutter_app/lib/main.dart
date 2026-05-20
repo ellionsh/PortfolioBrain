@@ -148,7 +148,7 @@ class _PortfolioBrainAppState extends State<PortfolioBrainApp> {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
 
-      title: 'PortfolioBrain',
+      title: 'AI资产管理',
 
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
