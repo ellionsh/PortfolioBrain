@@ -10,10 +10,13 @@ import config
 import datetime
 import time
 from sqlalchemy import text
+from decimal import Decimal
 
 def serialize(obj):
     if isinstance(obj, (datetime.date, datetime.datetime)):
         return obj.isoformat()
+    if isinstance(obj, Decimal):
+        return float(obj)
     if isinstance(obj, dict):
         return {k: serialize(v) for k, v in obj.items()}
     if isinstance(obj, list):
