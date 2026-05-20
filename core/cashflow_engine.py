@@ -50,6 +50,8 @@ class CashflowEngine:
 
             if dtype == "demand":
                 continue
+            if start is None or end is None:
+                continue
 
             days = (end - start).days
             interest = principal * rate * days / 365
@@ -92,6 +94,8 @@ class CashflowEngine:
         for r in rows:
             pid, account_id, principal, rate, start, end, freq = r
 
+            if start is None or end is None:
+                continue
             days = (end - start).days
             interest = principal * rate * days / 365
 
@@ -156,6 +160,8 @@ class CashflowEngine:
         """)).fetchall()
 
         for tx_id, pid, account_id, date, ttype, amount in rows:
+            if date is None:
+                continue
             exists = self.session.execute(text("""
                 SELECT COUNT(*) FROM cashflows
                 WHERE source_type='financial'
@@ -194,6 +200,8 @@ class CashflowEngine:
         """)).fetchall()
 
         for pid, account_id, premium, freq, years, start in rows:
+            if start is None:
+                continue
             if freq == "once":
                 exists = self.session.execute(text("""
                     SELECT COUNT(*) FROM cashflows
