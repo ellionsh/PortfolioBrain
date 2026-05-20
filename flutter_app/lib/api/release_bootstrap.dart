@@ -16,7 +16,7 @@ class ReleaseBootstrap {
     final prefs = await SharedPreferences.getInstance();
     final done = prefs.getBool(_releaseInitKey) ?? false;
     if (done) return;
-    await AuthStorage.clearToken();
+    await AuthStorage.clearTokens();
     await ApiServerConfig.clear();
     await prefs.setBool(_releaseInitKey, true);
   }

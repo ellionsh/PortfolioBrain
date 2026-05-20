@@ -1,22 +1,32 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthStorage {
-  static const _tokenKey = 'pb_auth_token';
+  static const _accessTokenKey = 'pb_auth_token';
+  static const _refreshTokenKey = 'pb_refresh_token';
 
-  static Future<String?> loadToken() async {
+  static Future<String?> loadAccessToken() async {
     final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString(_tokenKey);
+    final token = prefs.getString(_accessTokenKey);
     if (token == null || token.isEmpty) return null;
     return token;
   }
 
-  static Future<void> saveToken(String token) async {
+  static Future<String?> loadRefreshToken() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_tokenKey, token);
+    final token = prefs.getString(_refreshTokenKey);
+    if (token == null || token.isEmpty) return null;
+    return token;
   }
 
-  static Future<void> clearToken() async {
+  static Future<void> saveTokens(String accessToken, String refreshToken) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_tokenKey);
+    await prefs.setString(_accessTokenKey, accessToken);
+    await prefs.setString(_refreshTokenKey, refreshToken);
+  }
+
+  static Future<void> clearTokens() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_accessTokenKey);
+    await prefs.remove(_refreshTokenKey);
   }
 }

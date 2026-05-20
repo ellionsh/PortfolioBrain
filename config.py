@@ -36,6 +36,7 @@ ALLOW_REGISTER = os.getenv("PB_ALLOW_REGISTER", "false").lower() == "true"
 AUTH_SECRET = os.getenv("PB_AUTH_SECRET", "")
 AUTH_ALGORITHM = os.getenv("PB_AUTH_ALGORITHM", "HS256")
 AUTH_EXPIRES_MINUTES = int(os.getenv("PB_AUTH_EXPIRES_MINUTES", "720"))
+AUTH_REFRESH_EXPIRES_DAYS = int(os.getenv("PB_AUTH_REFRESH_EXPIRES_DAYS", "30"))
 
 # ============================
 # Task Configuration

@@ -19,28 +19,31 @@ Future<void> main() async {
   await ReleaseBootstrap.ensureCleanStart();
 
   final config = await ApiServerConfig.load();
-  final token = await AuthStorage.loadToken();
+  final accessToken = await AuthStorage.loadAccessToken();
+  final refreshToken = await AuthStorage.loadRefreshToken();
 
   ApiClient.configure(
     host: config.host,
     port: config.port,
     scheme: config.scheme,
   );
-  ApiClient.setToken(token);
+  ApiClient.setTokens(accessToken, refreshToken);
 
   runApp(
-    PortfolioBrainApp(initialConfig: config, initialToken: token),
+    PortfolioBrainApp(initialConfig: config, initialToken: accessToken, initialRefreshToken: refreshToken),
   );
 }
 
 class PortfolioBrainApp extends StatefulWidget {
   final ApiServerConfig initialConfig;
   final String? initialToken;
+  final String? initialRefreshToken;
 
   const PortfolioBrainApp({
     super.key,
     required this.initialConfig,
     required this.initialToken,
+    required this.initialRefreshToken,
   });
 
   @override
@@ -52,6 +55,7 @@ class _PortfolioBrainAppState extends State<PortfolioBrainApp> {
 
   late ApiServerConfig _config;
   String? _token;
+  String? _refreshToken;
   int _configVersion = 0;
   int _homeReloadVersion = 0;
 
@@ -61,6 +65,7 @@ class _PortfolioBrainAppState extends State<PortfolioBrainApp> {
 
     _config = widget.initialConfig;
     _token = widget.initialToken;
+    _refreshToken = widget.initialRefreshToken;
   }
 
   void _applyConfig(ApiServerConfig config) {
@@ -77,16 +82,17 @@ class _PortfolioBrainAppState extends State<PortfolioBrainApp> {
     });
   }
 
-  Future<void> _setToken(String? token) async {
-    ApiClient.setToken(token);
-    if (token == null) {
-      await AuthStorage.clearToken();
+  Future<void> _setTokens(String? accessToken, String? refreshToken) async {
+    ApiClient.setTokens(accessToken, refreshToken);
+    if (accessToken == null || refreshToken == null) {
+      await AuthStorage.clearTokens();
     } else {
-      await AuthStorage.saveToken(token);
+      await AuthStorage.saveTokens(accessToken, refreshToken);
     }
     if (!mounted) return;
     setState(() {
-      _token = token;
+      _token = accessToken;
+      _refreshToken = refreshToken;
       _index = 0;
     });
   }
@@ -163,7 +169,7 @@ class _PortfolioBrainAppState extends State<PortfolioBrainApp> {
                   builder: (context) {
                     return LoginPage(
                       onConfigRequested: () => _openServerConfig(context),
-                      onLoggedIn: (token) => _setToken(token),
+                      onLoggedIn: (accessToken, refreshToken) => _setTokens(accessToken, refreshToken),
                     );
                   },
                 )
@@ -180,7 +186,7 @@ class _PortfolioBrainAppState extends State<PortfolioBrainApp> {
                           ),
                           IconButton(
                             tooltip: '退出登录',
-                            onPressed: () => _setToken(null),
+                            onPressed: () => _setTokens(null, null),
                             icon: const Icon(Icons.logout),
                           ),
                         ],

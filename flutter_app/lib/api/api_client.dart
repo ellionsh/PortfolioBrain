@@ -1,9 +1,12 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'auth_storage.dart';
 
 class ApiClient {
   static String _baseUrl = 'http://192.168.71.31:5000';
   static String? _token;
+  static String? _refreshToken;
+  static Future<bool>? _refreshFuture;
 
   static String get baseUrl => _baseUrl;
 
@@ -14,6 +17,11 @@ class ApiClient {
   }) {
     final normalizedHost = host.trim().replaceAll(RegExp(r'^https?://'), '');
     _baseUrl = '$scheme://$normalizedHost:$port';
+  }
+
+  static void setTokens(String? accessToken, String? refreshToken) {
+    _token = accessToken;
+    _refreshToken = refreshToken;
   }
 
   static void setToken(String? token) {
@@ -55,6 +63,56 @@ class ApiClient {
     throw Exception('$label API error: ${resp.statusCode}$suffix');
   }
 
+  static Future<bool> _refreshAccessToken() {
+    if (_refreshToken == null || _refreshToken!.isEmpty) {
+      return Future.value(false);
+    }
+    if (_refreshFuture != null) {
+      return _refreshFuture!;
+    }
+    _refreshFuture = _doRefresh();
+    return _refreshFuture!.whenComplete(() {
+      _refreshFuture = null;
+    });
+  }
+
+  static Future<bool> _doRefresh() async {
+    final resp = await http.post(
+      Uri.parse('$baseUrl/refresh'),
+      headers: _headers(json: true, auth: false),
+      body: jsonEncode({'refresh_token': _refreshToken}),
+    );
+    if (resp.statusCode == 200) {
+      final data = jsonDecode(_readBody(resp)) as Map<String, dynamic>;
+      final access = data['access_token'] as String?;
+      final refresh = data['refresh_token'] as String?;
+      if (access != null &&
+          access.isNotEmpty &&
+          refresh != null &&
+          refresh.isNotEmpty) {
+        setTokens(access, refresh);
+        await AuthStorage.saveTokens(access, refresh);
+        return true;
+      }
+    }
+    await AuthStorage.clearTokens();
+    setTokens(null, null);
+    return false;
+  }
+
+  static Future<http.Response> _requestWithRetry(
+      Future<http.Response> Function() send) async {
+    final resp = await send();
+    if (resp.statusCode != 401) {
+      return resp;
+    }
+    final refreshed = await _refreshAccessToken();
+    if (!refreshed) {
+      return resp;
+    }
+    return await send();
+  }
+
   static Future<Map<String, dynamic>> login(
       String username, String password) async {
     final resp = await http.post(
@@ -65,8 +123,13 @@ class ApiClient {
     if (resp.statusCode == 200) {
       final data = jsonDecode(_readBody(resp)) as Map<String, dynamic>;
       final token = data['access_token'] as String?;
+      final refreshToken = data['refresh_token'] as String?;
       if (token != null && token.isNotEmpty) {
-        _token = token;
+        if (refreshToken != null && refreshToken.isNotEmpty) {
+          setTokens(token, refreshToken);
+        } else {
+          _token = token;
+        }
       }
       return data;
     } else {
@@ -76,11 +139,13 @@ class ApiClient {
   }
 
   static Future<String> chat(String query) async {
-    final resp = await http.post(
-      Uri.parse('$baseUrl/chat'),
-      headers: _headers(json: true),
-      body: jsonEncode({'query': query}),
-    );
+    final resp = await _requestWithRetry(() {
+      return http.post(
+        Uri.parse('$baseUrl/chat'),
+        headers: _headers(json: true),
+        body: jsonEncode({'query': query}),
+      );
+    });
     if (resp.statusCode == 200) {
       final data = jsonDecode(_readBody(resp));
       return data['response'] as String;
@@ -90,10 +155,12 @@ class ApiClient {
   }
 
   static Future<List<dynamic>> getAccounts() async {
-    final resp = await http.get(
-      Uri.parse('$baseUrl/accounts'),
-      headers: _headers(),
-    );
+    final resp = await _requestWithRetry(() {
+      return http.get(
+        Uri.parse('$baseUrl/accounts'),
+        headers: _headers(),
+      );
+    });
     if (resp.statusCode == 200) {
       return jsonDecode(_readBody(resp)) as List<dynamic>;
     } else {
@@ -102,10 +169,12 @@ class ApiClient {
   }
 
   static Future<List<dynamic>> getBankDeposits() async {
-    final resp = await http.get(
-      Uri.parse('$baseUrl/bank_deposits'),
-      headers: _headers(),
-    );
+    final resp = await _requestWithRetry(() {
+      return http.get(
+        Uri.parse('$baseUrl/bank_deposits'),
+        headers: _headers(),
+      );
+    });
     if (resp.statusCode == 200) {
       return jsonDecode(_readBody(resp)) as List<dynamic>;
     } else {
@@ -114,10 +183,12 @@ class ApiClient {
   }
 
   static Future<List<dynamic>> getCashflows() async {
-    final resp = await http.get(
-      Uri.parse('$baseUrl/cashflows'),
-      headers: _headers(),
-    );
+    final resp = await _requestWithRetry(() {
+      return http.get(
+        Uri.parse('$baseUrl/cashflows'),
+        headers: _headers(),
+      );
+    });
     if (resp.statusCode == 200) {
       return jsonDecode(_readBody(resp)) as List<dynamic>;
     } else {
@@ -126,10 +197,12 @@ class ApiClient {
   }
 
   static Future<List<dynamic>> getInsurance() async {
-    final resp = await http.get(
-      Uri.parse('$baseUrl/insurance_products'),
-      headers: _headers(),
-    );
+    final resp = await _requestWithRetry(() {
+      return http.get(
+        Uri.parse('$baseUrl/insurance_products'),
+        headers: _headers(),
+      );
+    });
     if (resp.statusCode == 200) {
       return jsonDecode(_readBody(resp)) as List<dynamic>;
     } else {
@@ -138,10 +211,12 @@ class ApiClient {
   }
 
   static Future<List<dynamic>> getFinancialProducts() async {
-    final resp = await http.get(
-      Uri.parse('$baseUrl/financial_products'),
-      headers: _headers(),
-    );
+    final resp = await _requestWithRetry(() {
+      return http.get(
+        Uri.parse('$baseUrl/financial_products'),
+        headers: _headers(),
+      );
+    });
     if (resp.statusCode == 200) {
       return jsonDecode(_readBody(resp)) as List<dynamic>;
     } else {
@@ -150,10 +225,12 @@ class ApiClient {
   }
 
   static Future<List<dynamic>> getFundProducts() async {
-    final resp = await http.get(
-      Uri.parse('$baseUrl/fund_products'),
-      headers: _headers(),
-    );
+    final resp = await _requestWithRetry(() {
+      return http.get(
+        Uri.parse('$baseUrl/fund_products'),
+        headers: _headers(),
+      );
+    });
     if (resp.statusCode == 200) {
       return jsonDecode(_readBody(resp)) as List<dynamic>;
     } else {
@@ -164,7 +241,9 @@ class ApiClient {
   static Future<Map<String, dynamic>> getFundMeta(String fundCode) async {
     final uri = Uri.parse('$baseUrl/fund_meta')
         .replace(queryParameters: {'fund_code': fundCode});
-    final resp = await http.get(uri, headers: _headers());
+    final resp = await _requestWithRetry(() {
+      return http.get(uri, headers: _headers());
+    });
     if (resp.statusCode == 200) {
       return jsonDecode(_readBody(resp)) as Map<String, dynamic>;
     } else {
@@ -173,10 +252,12 @@ class ApiClient {
   }
 
   static Future<Map<String, dynamic>> getSummary() async {
-    final resp = await http.get(
-      Uri.parse('$baseUrl/summary'),
-      headers: _headers(),
-    );
+    final resp = await _requestWithRetry(() {
+      return http.get(
+        Uri.parse('$baseUrl/summary'),
+        headers: _headers(),
+      );
+    });
     if (resp.statusCode == 200) {
       return jsonDecode(_readBody(resp)) as Map<String, dynamic>;
     } else {
@@ -185,11 +266,13 @@ class ApiClient {
   }
 
   static Future<Map<String, dynamic>> operate(String action, Map<String, dynamic> params) async {
-    final resp = await http.post(
-      Uri.parse('$baseUrl/operate'),
-      headers: _headers(json: true),
-      body: jsonEncode({'action': action, 'params': params}),
-    );
+    final resp = await _requestWithRetry(() {
+      return http.post(
+        Uri.parse('$baseUrl/operate'),
+        headers: _headers(json: true),
+        body: jsonEncode({'action': action, 'params': params}),
+      );
+    });
     if (resp.statusCode == 200) {
       return jsonDecode(_readBody(resp)) as Map<String, dynamic>;
     } else {

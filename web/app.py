@@ -90,7 +90,7 @@ import config
 from agent.agent import agent_chat
 from core.cashflow_engine import CashflowEngine
 from db.db import session_scope
-from web.auth import auth_required, authenticate_user, create_user, issue_token, ensure_auth_ready
+from web.auth import auth_required, authenticate_user, create_user, issue_token, issue_refresh_token, get_user_by_id, ensure_auth_ready
 
 app = Flask(__name__)
 CORS(app)
@@ -131,10 +131,13 @@ def login():
     if not user:
         return jsonify({"error": "用户名或密码错误"}), 401
     token = issue_token(user)
+    refresh_token = issue_refresh_token(user)
     return jsonify({
         "access_token": token,
+        "refresh_token": refresh_token,
         "token_type": "Bearer",
         "expires_in_minutes": config.AUTH_EXPIRES_MINUTES,
+        "refresh_expires_days": config.AUTH_REFRESH_EXPIRES_DAYS,
         "user": user,
     })
 
@@ -154,10 +157,54 @@ def register():
     if not user:
         return jsonify({"error": "用户名已存在"}), 409
     token = issue_token(user)
+    refresh_token = issue_refresh_token(user)
     return jsonify({
         "access_token": token,
+        "refresh_token": refresh_token,
         "token_type": "Bearer",
         "expires_in_minutes": config.AUTH_EXPIRES_MINUTES,
+        "refresh_expires_days": config.AUTH_REFRESH_EXPIRES_DAYS,
+        "user": user,
+    })
+
+
+@app.route("/refresh", methods=["POST"])
+def refresh():
+    data = request.json or {}
+    token = (data.get("refresh_token") or "").strip()
+    if not token:
+        return jsonify({"error": "缺少刷新令牌"}), 400
+    try:
+        from web.auth import _get_jwt as _get_jwt_local
+        jwt = _get_jwt_local()
+        payload = jwt.decode(
+            token,
+            config.AUTH_SECRET,
+            algorithms=[config.AUTH_ALGORITHM],
+        )
+        if payload.get("type") != "refresh":
+            return jsonify({"error": "刷新令牌无效"}), 401
+    except Exception as exc:
+        err_name = exc.__class__.__name__
+        if err_name == "ExpiredSignatureError":
+            return jsonify({"error": "刷新令牌已过期"}), 401
+        return jsonify({"error": "刷新令牌无效"}), 401
+
+    user_id = payload.get("sub")
+    if not user_id:
+        return jsonify({"error": "刷新令牌无效"}), 401
+    user = get_user_by_id(user_id)
+    if not user:
+        return jsonify({"error": "用户无效"}), 401
+
+    access_token = issue_token(user)
+    refresh_token = issue_refresh_token(user)
+    return jsonify({
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "Bearer",
+        "expires_in_minutes": config.AUTH_EXPIRES_MINUTES,
+        "refresh_expires_days": config.AUTH_REFRESH_EXPIRES_DAYS,
         "user": user,
     })
 

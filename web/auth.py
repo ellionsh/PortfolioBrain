@@ -88,6 +88,9 @@ def auth_required(fn):
                 config.AUTH_SECRET,
                 algorithms=[config.AUTH_ALGORITHM],
             )
+            token_type = payload.get("type")
+            if token_type and token_type != "access":
+                raise jwt.InvalidTokenError("Invalid token type")
         except jwt.ExpiredSignatureError:
             logger.warning(
                 "Auth token expired path=%s token=%s",
@@ -134,6 +137,21 @@ def authenticate_user(username: str, password: str):
     return {"id": row["id"], "username": row["username"]}
 
 
+def get_user_by_id(user_id: str | int):
+    engine = _get_engine()
+    with engine.begin() as conn:
+        row = conn.execute(
+            text(
+                "SELECT id, username, is_active "
+                "FROM users WHERE id = :id LIMIT 1"
+            ),
+            {"id": user_id},
+        ).mappings().first()
+    if not row or not row.get("is_active"):
+        return None
+    return {"id": row["id"], "username": row["username"]}
+
+
 def create_user(username: str, password: str):
     engine = _get_engine()
     password_hash = generate_password_hash(password)
@@ -170,5 +188,21 @@ def issue_token(user):
         "username": user["username"],
         "iat": int(now.timestamp()),
         "exp": int(exp.timestamp()),
+        "type": "access",
+    }
+    return jwt.encode(payload, config.AUTH_SECRET, algorithm=config.AUTH_ALGORITHM)
+
+
+def issue_refresh_token(user):
+    _require_secret()
+    jwt = _get_jwt()
+    now = datetime.datetime.utcnow()
+    exp = now + datetime.timedelta(days=config.AUTH_REFRESH_EXPIRES_DAYS)
+    payload = {
+        "sub": str(user["id"]),
+        "username": user["username"],
+        "iat": int(now.timestamp()),
+        "exp": int(exp.timestamp()),
+        "type": "refresh",
     }
     return jwt.encode(payload, config.AUTH_SECRET, algorithm=config.AUTH_ALGORITHM)

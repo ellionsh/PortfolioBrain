@@ -4,7 +4,7 @@ import '../api/api_client.dart';
 
 class LoginPage extends StatefulWidget {
   final VoidCallback onConfigRequested;
-  final ValueChanged<String> onLoggedIn;
+  final void Function(String accessToken, String refreshToken) onLoggedIn;
 
   const LoginPage({
     super.key,
@@ -43,12 +43,17 @@ class _LoginPageState extends State<LoginPage> {
     try {
       final data = await ApiClient.login(username, password);
       final token = data['access_token'] as String?;
+      final refreshToken = data['refresh_token'] as String?;
       if (token == null || token.isEmpty) {
         setState(() => _error = '登录失败：无效令牌');
         return;
       }
-      ApiClient.setToken(token);
-      widget.onLoggedIn(token);
+      if (refreshToken == null || refreshToken.isEmpty) {
+        setState(() => _error = '登录失败：无效刷新令牌');
+        return;
+      }
+      ApiClient.setTokens(token, refreshToken);
+      widget.onLoggedIn(token, refreshToken);
     } catch (e) {
       final msg = e.toString();
       final clean = msg.startsWith('Exception: ') ? msg.substring(11) : msg;
