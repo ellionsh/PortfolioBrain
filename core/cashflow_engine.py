@@ -19,12 +19,15 @@ class CashflowEngine:
     # ============================
     # 主入口
     # ============================
-    def generate_all(self):
+    def generate_all(self, dry_run: bool = False):
         try:
             self.generate_bank_deposit()
             self.generate_fixed_financial()
             self.generate_nav_financial()
             self.generate_insurance()
+            if dry_run:
+                self.session.rollback()
+                return {"status": "success", "dry_run": True}
             self.session.commit()
             return {"status": "success"}
         except Exception as e:
@@ -240,4 +243,3 @@ class CashflowEngine:
                     })
 
                 d += delta
-

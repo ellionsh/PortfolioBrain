@@ -2,7 +2,7 @@
 import time
 import akshare as ak
 import config
-from db.db import get_session
+from db.db import session_scope
 from sqlalchemy import text
 
 class FundNavUpdater:
@@ -10,28 +10,17 @@ class FundNavUpdater:
     @staticmethod
     def update_all_funds():
         """读取 fund_navs 表中的基金代码并更新所有记录（不新增）"""
-        session = get_session()
+        with session_scope() as session:
+            with session.begin():
+                rows = session.execute(
+                    text("SELECT DISTINCT fund_code FROM fund_navs")
+                ).fetchall()
 
-        try:
-            # 1. 获取所有基金代码（distinct）
-            rows = session.execute(
-                text("SELECT DISTINCT fund_code FROM fund_navs")
-            ).fetchall()
+                codes = [row[0] for row in rows]
+                print(f"发现基金代码: {codes}")
 
-            codes = [row[0] for row in rows]
-            print(f"发现基金代码: {codes}")
-
-            for code in codes:
-                FundNavUpdater.update_single_fund(session, code)
-
-            session.commit()
-
-        except Exception as e:
-            session.rollback()
-            raise e
-
-        finally:
-            session.close()
+                for code in codes:
+                    FundNavUpdater.update_single_fund(session, code)
 
     @staticmethod
     def update_single_fund(session, code: str):
@@ -41,7 +30,6 @@ class FundNavUpdater:
         # 2. 获取最新净值（失败重试）
         attempts = max(1, config.FUND_NAV_RETRY_ATTEMPTS)
         base_sleep_seconds = max(0.1, config.FUND_NAV_RETRY_BASE_SECONDS)
-        last_error = None
         for attempt in range(1, attempts + 1):
             try:
                 df = ak.fund_open_fund_info_em(symbol=code, indicator="单位净值走势")
@@ -50,7 +38,6 @@ class FundNavUpdater:
                 latest = df.iloc[-1]
                 break
             except Exception as e:
-                last_error = e
                 if attempt < attempts:
                     sleep_seconds = base_sleep_seconds * attempt
                     print(f"获取净值失败，{sleep_seconds}s 后重试（第 {attempt}/{attempts} 次）：{e}")

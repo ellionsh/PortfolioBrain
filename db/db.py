@@ -1,6 +1,7 @@
 # db/db.py
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from contextlib import contextmanager
 import config
 
 DATABASE_URL = (
@@ -23,3 +24,10 @@ def get_engine():
 def get_session():
     return SessionLocal()
 
+@contextmanager
+def session_scope():
+    session = get_session()
+    try:
+        yield session
+    finally:
+        session.close()

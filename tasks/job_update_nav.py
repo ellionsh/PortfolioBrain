@@ -1,29 +1,24 @@
 # tasks/job_update_nav.py
 import datetime
 import random
-import pymysql
+from sqlalchemy import text
 
-def update_nav(conn):
-    cur = conn.cursor()
+def update_nav(session):
+    with session.begin():
+        rows = session.execute(text("""
+            SELECT product_code FROM financial_products
+            WHERE is_nav_based=1 AND status='active'
+        """)).fetchall()
 
-    # 获取所有净值型产品
-    cur.execute("""
-        SELECT product_code FROM financial_products
-        WHERE is_nav_based=1 AND status='active'
-    """)
-    products = cur.fetchall()
+        products = [row[0] for row in rows]
+        today = datetime.date.today()
 
-    today = datetime.date.today()
+        for product_code in products:
+            nav = round(1 + random.uniform(-0.01, 0.01), 4)
+            session.execute(text("""
+                INSERT INTO financial_navs (product_code, date, nav, currency)
+                VALUES (:code, :d, :nav, 'CNY')
+                ON DUPLICATE KEY UPDATE nav=:nav
+            """), {"code": product_code, "d": today, "nav": nav})
 
-    for (product_code,) in products:
-        # 模拟净值（未来可替换为真实 API）
-        nav = round(1 + random.uniform(-0.01, 0.01), 4)
-
-        cur.execute("""
-            INSERT INTO financial_navs (product_code, date, nav, currency)
-            VALUES (%s, %s, %s, 'CNY')
-            ON DUPLICATE KEY UPDATE nav=%s
-        """, (product_code, today, nav, nav))
-
-    conn.commit()
     return {"status": "success", "updated": len(products)}

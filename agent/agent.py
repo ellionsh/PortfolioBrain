@@ -2,7 +2,7 @@
 import json
 from openai import OpenAI
 
-from db.db import get_engine, get_session
+from db.db import session_scope
 from skills.sql_skill import SQLSkill
 from skills.operation_skill import OperationSkill
 from agent.prompts import AGENT_SYSTEM_PROMPT
@@ -26,13 +26,8 @@ client = OpenAI(
     base_url=config.DEEPSEEK_BASE_URL
 )
 
-# 全局 SQLAlchemy engine + session
-engine = get_engine()
-session = get_session()
-
 # 初始化技能
 sql_skill = SQLSkill()              # 自动使用 engine
-op_skill = OperationSkill(session)  # 使用 SQLAlchemy session
 
 
 # 工具定义（已合并新版 LLM 友好描述）
@@ -108,7 +103,9 @@ def call_tool(name, args):
     if name == "run_sql":
         return sql_skill.run_sql(args["query"])
     if name == "operate":
-        return op_skill.operate(args["action"], args["params"])
+        with session_scope() as session:
+            op_skill = OperationSkill(session)
+            return op_skill.operate(args["action"], args["params"])
     return {"error": "unknown tool"}
 
 
@@ -154,4 +151,3 @@ def agent_chat(user_query: str) -> str:
             continue
         print("总耗时:", time.time() - start_total)
         return msg.content
-

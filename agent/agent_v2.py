@@ -5,7 +5,7 @@ import asyncio
 import time
 from openai import OpenAI
 
-from db.db import get_engine, get_session
+from db.db import session_scope
 from skills.sql_skill import SQLSkill
 from skills.operation_skill import OperationSkill
 from agent.prompts import AGENT_SYSTEM_PROMPT
@@ -39,11 +39,7 @@ client = OpenAI(
     base_url=config.DEEPSEEK_BASE_URL
 )
 
-engine = get_engine()
-session = get_session()
-
 sql_skill = SQLSkill()
-op_skill = OperationSkill(session)
 
 
 tools = [
@@ -87,7 +83,9 @@ def call_tool(name, args):
         return sql_skill.run_sql(query)
 
     if name == "operate":
-        return op_skill.operate(args["action"], args["params"])
+        with session_scope() as session:
+            op_skill = OperationSkill(session)
+            return op_skill.operate(args["action"], args["params"])
 
     return {"error": "unknown tool"}
 

@@ -1,24 +1,26 @@
 # tasks/job_maturity_alert.py
 import datetime
 import pandas as pd
+from sqlalchemy import text
 
-def maturity_alert(conn):
-    today = datetime.date.today()
-    alert_date = today + datetime.timedelta(days=7)
+def maturity_alert(session):
+    with session.begin():
+        today = datetime.date.today()
+        alert_date = today + datetime.timedelta(days=7)
 
-    df = pd.read_sql("""
-        SELECT product_name, end_date
-        FROM financial_products
-        WHERE end_date IS NOT NULL
-    """, conn)
+        df = pd.read_sql(text("""
+            SELECT product_name, end_date
+            FROM financial_products
+            WHERE end_date IS NOT NULL
+        """), session.bind)
 
-    alerts = df[df["end_date"] <= alert_date]
+        alerts = df[df["end_date"] <= alert_date]
 
-    if len(alerts) == 0:
-        return {"status": "no_alerts"}
+        if len(alerts) == 0:
+            return {"status": "no_alerts"}
 
-    print("=== 理财产品到期提醒（未来 7 天） ===")
-    for _, row in alerts.iterrows():
-        print(f"- {row['product_name']} 将于 {row['end_date']} 到期")
+        print("=== 理财产品到期提醒（未来 7 天） ===")
+        for _, row in alerts.iterrows():
+            print(f"- {row['product_name']} 将于 {row['end_date']} 到期")
 
-    return {"status": "success", "count": len(alerts)}
+        return {"status": "success", "count": len(alerts)}

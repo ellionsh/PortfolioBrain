@@ -88,9 +88,8 @@ from flask_cors import CORS
 import config
 
 from agent.agent import agent_chat
-from core.asset_operator import AssetOperator
 from core.cashflow_engine import CashflowEngine
-from db.db import get_engine, get_session
+from db.db import session_scope
 from web.auth import auth_required, authenticate_user, create_user, issue_token, ensure_auth_ready
 
 app = Flask(__name__)
@@ -101,14 +100,6 @@ if config.REQUIRE_AUTH and not config.AUTH_SECRET:
     raise RuntimeError("PB_AUTH_SECRET is required when PB_REQUIRE_AUTH=true")
 ensure_auth_ready()
 
-# 全局 SQLAlchemy engine + session
-engine = get_engine()
-session = get_session()
-
-# 资产操作器 & 现金流引擎（使用 SQLAlchemy session）
-#op = AssetOperator(session)
-op_skill = OperationSkill(session)
-cf_engine = CashflowEngine(session)
 
 
 @app.route("/")
@@ -184,80 +175,155 @@ def me():
 @app.route("/accounts", methods=["GET"])
 @auth_required
 def get_accounts():
-    df = pd.read_sql("SELECT * FROM accounts ORDER BY id", engine)
-    data = df.to_dict(orient="records")
-    return jsonify(serialize(data))
+    with session_scope() as session:
+        df = pd.read_sql(text("SELECT * FROM accounts ORDER BY id"), session.bind)
+        data = df.to_dict(orient="records")
+        return jsonify(serialize(data))
 
 @app.route("/bank_deposits", methods=["GET"])
 @auth_required
 def get_bank_deposits():
-    df = pd.read_sql("""
+    with session_scope() as session:
+        df = pd.read_sql(text("""
         SELECT id, account_id, deposit_type, principal, interest_rate,
                start_date, end_date, status
         FROM bank_deposits
         ORDER BY id DESC
-    """, engine)
-    data = df.to_dict(orient="records")
-    return jsonify(serialize(data))
+    """), session.bind)
+        data = df.to_dict(orient="records")
+        return jsonify(serialize(data))
 
 @app.route("/cashflows", methods=["GET"])
 @auth_required
 def get_cashflows_api():
-    df = pd.read_sql("""
+    with session_scope() as session:
+        df = pd.read_sql(text("""
         SELECT id, source_type, source_id, account_id,
                date, amount, currency, direction, description
         FROM cashflows
         ORDER BY date DESC
-    """, engine)
-    data = df.to_dict(orient="records")
-    return jsonify(serialize(data))
+    """), session.bind)
+        data = df.to_dict(orient="records")
+        return jsonify(serialize(data))
 
 @app.route("/insurance_products", methods=["GET"])
 @auth_required
 def get_insurance_products():
-    df = pd.read_sql("""
+    with session_scope() as session:
+        df = pd.read_sql(text("""
         SELECT id, account_id, product_name, company, type,
                premium, premium_freq, premium_years,
                coverage_amount, start_date, end_date, cash_value,
                status, remark
         FROM insurance_products
         ORDER BY id DESC
-    """, engine)
-    data = df.to_dict(orient="records")
-    return jsonify(serialize(data))
+    """), session.bind)
+        data = df.to_dict(orient="records")
+        return jsonify(serialize(data))
 
 @app.route("/financial_products", methods=["GET"])
 @auth_required
 def get_financial_products():
-    df = pd.read_sql("""
-        SELECT fp.id, fp.account_id, fp.product_name, fp.product_code, fp.type,
-               fp.currency, fp.is_nav_based, fp.risk_level,
-               fp.min_redeem_unit, fp.shares, fp.principal,
-               fp.expected_yield, fp.start_date, fp.end_date,
-               fp.pay_freq, fp.status, fp.remark,
-               (
-                   SELECT fn.nav
-                   FROM financial_navs fn
-                   WHERE fn.product_code = fp.product_code
-                   ORDER BY fn.date DESC
-                   LIMIT 1
-               ) AS nav
-        FROM financial_products fp
-        ORDER BY fp.end_date IS NOT NULL, fp.end_date ASC, fp.id DESC
-    """, engine)
-    data = df.to_dict(orient="records")
-    if data:
-        product_ids = [row.get("id") for row in data if row.get("id") is not None]
-        cashflow_map = {pid: [] for pid in product_ids}
-        if product_ids:
-            placeholders = ", ".join([f":id{i}" for i in range(len(product_ids))])
-            params = {f"id{i}": product_ids[i] for i in range(len(product_ids))}
+    with session_scope() as session:
+        df = pd.read_sql(text("""
+            SELECT fp.id, fp.account_id, fp.product_name, fp.product_code, fp.type,
+                   fp.currency, fp.is_nav_based, fp.risk_level,
+                   fp.min_redeem_unit, fp.shares, fp.principal,
+                   fp.expected_yield, fp.start_date, fp.end_date,
+                   fp.pay_freq, fp.status, fp.remark,
+                   (
+                       SELECT fn.nav
+                       FROM financial_navs fn
+                       WHERE fn.product_code = fp.product_code
+                       ORDER BY fn.date DESC
+                       LIMIT 1
+                   ) AS nav
+            FROM financial_products fp
+            ORDER BY fp.end_date IS NOT NULL, fp.end_date ASC, fp.id DESC
+        """), session.bind)
+        data = df.to_dict(orient="records")
+        if data:
+            product_ids = [row.get("id") for row in data if row.get("id") is not None]
+            cashflow_map = {pid: [] for pid in product_ids}
+            if product_ids:
+                placeholders = ", ".join([f":id{i}" for i in range(len(product_ids))])
+                params = {f"id{i}": product_ids[i] for i in range(len(product_ids))}
+                rows = session.execute(text(f"""
+                    SELECT product_id, trade_date, trade_type, amount, fee
+                    FROM financial_transactions
+                    WHERE product_id IN ({placeholders})
+                """), params).fetchall()
+                for product_id, trade_date, trade_type, amount, fee in rows:
+                    try:
+                        amount_value = float(amount) if amount is not None else 0.0
+                    except (TypeError, ValueError):
+                        continue
+                    fee_value = 0.0
+                    if fee is not None:
+                        try:
+                            fee_value = float(fee)
+                        except (TypeError, ValueError):
+                            fee_value = 0.0
+                    if trade_type == "buy":
+                        signed_amount = -abs(amount_value) - fee_value
+                    else:
+                        signed_amount = abs(amount_value) - fee_value
+                    cashflow_map.setdefault(product_id, []).append((trade_date, signed_amount))
+
+            today = datetime.date.today()
+            for row in data:
+                pid = row.get("id")
+                cashflows = list(cashflow_map.get(pid, []))
+                is_nav_based = row.get("is_nav_based") in (1, True) or row.get("type") == "nav"
+                shares = row.get("shares")
+                nav = row.get("nav")
+                market_value = None
+                try:
+                    if is_nav_based:
+                        if shares is not None and nav is not None:
+                            market_value = float(shares) * float(nav)
+                    else:
+                        if shares is not None:
+                            market_value = float(shares)
+                except (TypeError, ValueError):
+                    market_value = None
+                if market_value is not None:
+                    cashflows.append((today, market_value))
+                row["annualized_yield"] = _xirr(cashflows) if cashflows else None
+        return jsonify(serialize(data))
+
+@app.route("/fund_products", methods=["GET"])
+@auth_required
+def get_fund_products():
+    with session_scope() as session:
+        df = pd.read_sql(text("""
+            SELECT f.id, f.account_id, f.fund_name, f.fund_code, f.currency,
+                   f.shares, f.principal, f.start_date, f.end_date,
+                   f.status, f.remark,
+                   (
+                       SELECT fn.nav
+                       FROM fund_navs fn
+                       WHERE fn.fund_code = f.fund_code
+                       ORDER BY fn.date DESC
+                       LIMIT 1
+                   ) AS nav
+            FROM fund_products f
+            ORDER BY f.end_date IS NOT NULL, f.end_date ASC, f.id DESC
+        """), session.bind)
+        data = df.to_dict(orient="records")
+        fund_ids = [row.get("id") for row in data if row.get("id") is not None]
+        cashflow_map = {fid: [] for fid in fund_ids}
+        if fund_ids:
+            placeholders = ", ".join([f":id{i}" for i in range(len(fund_ids))])
+            params = {f"id{i}": fund_ids[i] for i in range(len(fund_ids))}
             rows = session.execute(text(f"""
-                SELECT product_id, trade_date, trade_type, amount, fee
-                FROM financial_transactions
-                WHERE product_id IN ({placeholders})
+                SELECT fund_id, trade_date, trade_type, amount, fee
+                FROM fund_transactions
+                WHERE fund_id IN ({placeholders})
             """), params).fetchall()
-            for product_id, trade_date, trade_type, amount, fee in rows:
+            for fund_id, trade_date, trade_type, amount, fee in rows:
+                if trade_date is None:
+                    continue
                 try:
                     amount_value = float(amount) if amount is not None else 0.0
                 except (TypeError, ValueError):
@@ -272,93 +338,24 @@ def get_financial_products():
                     signed_amount = -abs(amount_value) - fee_value
                 else:
                     signed_amount = abs(amount_value) - fee_value
-                cashflow_map.setdefault(product_id, []).append((trade_date, signed_amount))
+                cashflow_map.setdefault(fund_id, []).append((trade_date, signed_amount))
 
         today = datetime.date.today()
         for row in data:
-            pid = row.get("id")
-            cashflows = list(cashflow_map.get(pid, []))
-            is_nav_based = row.get("is_nav_based") in (1, True) or row.get("type") == "nav"
+            fid = row.get("id")
+            cashflows = list(cashflow_map.get(fid, []))
             shares = row.get("shares")
             nav = row.get("nav")
             market_value = None
             try:
-                if is_nav_based:
-                    if shares is not None and nav is not None:
-                        market_value = float(shares) * float(nav)
-                else:
-                    if shares is not None:
-                        market_value = float(shares)
+                if shares is not None and nav is not None:
+                    market_value = float(shares) * float(nav)
             except (TypeError, ValueError):
                 market_value = None
             if market_value is not None:
                 cashflows.append((today, market_value))
             row["annualized_yield"] = _xirr(cashflows) if cashflows else None
-    return jsonify(serialize(data))
-
-@app.route("/fund_products", methods=["GET"])
-@auth_required
-def get_fund_products():
-    df = pd.read_sql("""
-        SELECT f.id, f.account_id, f.fund_name, f.fund_code, f.currency,
-               f.shares, f.principal, f.start_date, f.end_date,
-               f.status, f.remark,
-               (
-                   SELECT fn.nav
-                   FROM fund_navs fn
-                   WHERE fn.fund_code = f.fund_code
-                   ORDER BY fn.date DESC
-                   LIMIT 1
-               ) AS nav
-        FROM fund_products f
-        ORDER BY f.end_date IS NOT NULL, f.end_date ASC, f.id DESC
-    """, engine)
-    data = df.to_dict(orient="records")
-    fund_ids = [row.get("id") for row in data if row.get("id") is not None]
-    cashflow_map = {fid: [] for fid in fund_ids}
-    if fund_ids:
-        placeholders = ", ".join([f":id{i}" for i in range(len(fund_ids))])
-        params = {f"id{i}": fund_ids[i] for i in range(len(fund_ids))}
-        rows = session.execute(text(f"""
-            SELECT fund_id, trade_date, trade_type, amount, fee
-            FROM fund_transactions
-            WHERE fund_id IN ({placeholders})
-        """), params).fetchall()
-        for fund_id, trade_date, trade_type, amount, fee in rows:
-            if trade_date is None:
-                continue
-            try:
-                amount_value = float(amount) if amount is not None else 0.0
-            except (TypeError, ValueError):
-                continue
-            fee_value = 0.0
-            if fee is not None:
-                try:
-                    fee_value = float(fee)
-                except (TypeError, ValueError):
-                    fee_value = 0.0
-            if trade_type == "buy":
-                signed_amount = -abs(amount_value) - fee_value
-            else:
-                signed_amount = abs(amount_value) - fee_value
-            cashflow_map.setdefault(fund_id, []).append((trade_date, signed_amount))
-
-    today = datetime.date.today()
-    for row in data:
-        fid = row.get("id")
-        cashflows = list(cashflow_map.get(fid, []))
-        shares = row.get("shares")
-        nav = row.get("nav")
-        market_value = None
-        try:
-            if shares is not None and nav is not None:
-                market_value = float(shares) * float(nav)
-        except (TypeError, ValueError):
-            market_value = None
-        if market_value is not None:
-            cashflows.append((today, market_value))
-        row["annualized_yield"] = _xirr(cashflows) if cashflows else None
-    return jsonify(serialize(data))
+        return jsonify(serialize(data))
 
 @app.route("/fund_meta", methods=["GET"])
 @auth_required
@@ -384,14 +381,15 @@ def fund_meta():
 @app.route("/financial_transactions", methods=["GET"])
 @auth_required
 def get_financial_transactions():
-    df = pd.read_sql("""
-        SELECT id, product_id, account_id, trade_date,
-               trade_type, shares, amount, nav
-        FROM financial_transactions
-        ORDER BY trade_date DESC
-    """, engine)
-    data = df.to_dict(orient="records")
-    return jsonify(serialize(data))
+    with session_scope() as session:
+        df = pd.read_sql(text("""
+            SELECT id, product_id, account_id, trade_date,
+                   trade_type, shares, amount, nav
+            FROM financial_transactions
+            ORDER BY trade_date DESC
+        """), session.bind)
+        data = df.to_dict(orient="records")
+        return jsonify(serialize(data))
 
 
 # ============================
@@ -410,33 +408,31 @@ def chat():
 @app.route("/summary", methods=["GET"])
 @auth_required
 def summary():
-    # 从视图中直接获取各类资产和总资产
-    df_summary = pd.read_sql("SELECT * FROM asset_summary_view", engine)
+    with session_scope() as session:
+        df_summary = pd.read_sql(text("SELECT * FROM asset_summary_view"), session.bind)
 
-    # 取出结果
-    bank_value = float(df_summary["bank_assets"][0] or 0)
-    financial_value = float(df_summary["financial_assets"][0] or 0)
-    fund_value = float(df_summary["fund_assets"][0] or 0)
-    insurance_value = float(df_summary["insurance_assets"][0] or 0)
-    total_assets = float(df_summary["total_assets"][0] or 0)
+        bank_value = float(df_summary["bank_assets"][0] or 0)
+        financial_value = float(df_summary["financial_assets"][0] or 0)
+        fund_value = float(df_summary["fund_assets"][0] or 0)
+        insurance_value = float(df_summary["insurance_assets"][0] or 0)
+        total_assets = float(df_summary["total_assets"][0] or 0)
 
-    # 未来6个月现金流仍然单独查询
-    df_cf = pd.read_sql("""
-        SELECT COALESCE(SUM(amount),0) AS v 
-        FROM cashflows
-        WHERE date >= CURDATE()
-        AND date < DATE_ADD(CURDATE(), INTERVAL 180 DAY)
-    """, engine)
-    future_6m_cf = float(df_cf["v"][0] or 0)
+        df_cf = pd.read_sql(text("""
+            SELECT COALESCE(SUM(amount),0) AS v 
+            FROM cashflows
+            WHERE date >= CURDATE()
+            AND date < DATE_ADD(CURDATE(), INTERVAL 180 DAY)
+        """), session.bind)
+        future_6m_cf = float(df_cf["v"][0] or 0)
 
-    return {
-        "total_assets": total_assets,
-        "bank_assets": bank_value,
-        "financial_assets": financial_value,
-        "fund_assets": fund_value,
-        "insurance_assets": insurance_value,
-        "future_6m_cf": future_6m_cf
-    }
+        return {
+            "total_assets": total_assets,
+            "bank_assets": bank_value,
+            "financial_assets": financial_value,
+            "fund_assets": fund_value,
+            "insurance_assets": insurance_value,
+            "future_6m_cf": future_6m_cf
+        }
 
 
 
@@ -447,13 +443,14 @@ def summary():
 @app.route("/positions", methods=["GET"])
 @auth_required
 def positions():
-    df = pd.read_sql("""
-        SELECT date, account_id, asset_code, shares, cost, market_value, currency
-        FROM positions
-        ORDER BY date DESC
-        LIMIT 200
-    """, engine)
-    return df.to_dict(orient="records")
+    with session_scope() as session:
+        df = pd.read_sql(text("""
+            SELECT date, account_id, asset_code, shares, cost, market_value, currency
+            FROM positions
+            ORDER BY date DESC
+            LIMIT 200
+        """), session.bind)
+        return df.to_dict(orient="records")
 
 
 # ============================
@@ -462,13 +459,14 @@ def positions():
 @app.route("/cashflows", methods=["GET"])
 @auth_required
 def cashflows():
-    df = pd.read_sql("""
-        SELECT date, amount, currency, direction, description
-        FROM cashflows
-        WHERE date >= CURDATE()
-        ORDER BY date
-    """, engine)
-    return df.to_dict(orient="records")
+    with session_scope() as session:
+        df = pd.read_sql(text("""
+            SELECT date, amount, currency, direction, description
+            FROM cashflows
+            WHERE date >= CURDATE()
+            ORDER BY date
+        """), session.bind)
+        return df.to_dict(orient="records")
 
 
 # ============================
@@ -477,13 +475,14 @@ def cashflows():
 @app.route("/products", methods=["GET"])
 @auth_required
 def products():
-    df = pd.read_sql("""
-        SELECT id, product_name, product_code, type, currency,
-               principal, expected_yield, start_date, end_date, status
-        FROM financial_products
-        ORDER BY id DESC
-    """, engine)
-    return df.to_dict(orient="records")
+    with session_scope() as session:
+        df = pd.read_sql(text("""
+            SELECT id, product_name, product_code, type, currency,
+                   principal, expected_yield, start_date, end_date, status
+            FROM financial_products
+            ORDER BY id DESC
+        """), session.bind)
+        return df.to_dict(orient="records")
 
 
 # ============================
@@ -492,13 +491,14 @@ def products():
 @app.route("/nav/<product_code>", methods=["GET"])
 @auth_required
 def nav_curve(product_code):
-    df = pd.read_sql("""
-        SELECT date, nav
-        FROM financial_navs
-        WHERE product_code=%s
-        ORDER BY date
-    """, engine, params=[product_code])
-    return df.to_dict(orient="records")
+    with session_scope() as session:
+        df = pd.read_sql(text("""
+            SELECT date, nav
+            FROM financial_navs
+            WHERE product_code=:code
+            ORDER BY date
+        """), session.bind, params={"code": product_code})
+        return df.to_dict(orient="records")
 
 
 # ============================
@@ -507,12 +507,13 @@ def nav_curve(product_code):
 @app.route("/maturity", methods=["GET"])
 @auth_required
 def maturity():
-    df = pd.read_sql("""
-        SELECT product_name, start_date, end_date
-        FROM financial_products
-        WHERE end_date IS NOT NULL
-    """, engine)
-    return df.to_dict(orient="records")
+    with session_scope() as session:
+        df = pd.read_sql(text("""
+            SELECT product_name, start_date, end_date
+            FROM financial_products
+            WHERE end_date IS NOT NULL
+        """), session.bind)
+        return df.to_dict(orient="records")
 
 
 # ============================
@@ -524,9 +525,10 @@ def operate():
     data = request.json
     action = data.get("action")
     params = data.get("params", {})
-
-    result = op_skill.operate(action, params)
-    return jsonify(result)
+    with session_scope() as session:
+        op_skill = OperationSkill(session)
+        result = op_skill.operate(action, params)
+        return jsonify(result)
 
 
 # ============================
@@ -535,8 +537,10 @@ def operate():
 @app.route("/generate_cashflows", methods=["POST"])
 @auth_required
 def generate_cashflows():
-    cf_engine.generate_all()
-    return {"status": "success"}
+    with session_scope() as session:
+        cf_engine = CashflowEngine(session)
+        cf_engine.generate_all()
+        return {"status": "success"}
 
 
 # ============================
