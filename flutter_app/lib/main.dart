@@ -171,7 +171,7 @@ class _PortfolioBrainAppState extends State<PortfolioBrainApp> {
                   builder: (context) {
                     return Scaffold(
                       appBar: AppBar(
-                        title: const Text('PortfolioBrain'),
+                        title: const Text('AI资产管理'),
                         actions: [
                           IconButton(
                             tooltip: '服务器配置',

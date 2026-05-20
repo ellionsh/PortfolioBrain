@@ -1,6 +1,6 @@
 # portfolio_brain_app
 
-PortfolioBrain 的 Flutter 客户端。
+AI资产管理 的 Flutter 客户端。
 
 ## Auth
 
