@@ -37,13 +37,7 @@ class AssetOperator:
             text("SELECT 1 FROM fund_navs WHERE fund_code=:fcode LIMIT 1"),
             {"fcode": fund_code},
         ).scalar()
-        if exists:
-            self.session.execute(text("""
-                UPDATE fund_navs
-                SET date=:date, nav=:nav, currency='CNY'
-                WHERE fund_code=:fcode
-            """), {"fcode": fund_code, "date": date, "nav": nav})
-        else:
+        if not exists:
             self.session.execute(text("""
                 INSERT INTO fund_navs (fund_code, date, nav, currency)
                 VALUES (:fcode, :date, :nav, 'CNY')
@@ -748,13 +742,11 @@ class AssetOperator:
                 WHERE fund_code=:fcode
                 LIMIT 1
             """), {
-                "fcode": fund_code, 
-                "start_date": start_date}).scalar()
+                "fcode": fund_code}).scalar()
             if not nav_exists:
                 self.session.execute(text("""
                     INSERT INTO fund_navs (fund_code, date, nav, currency)
                     VALUES (:fcode, COALESCE(:start_date, CURDATE()), :nav, :currency)
-                    ON DUPLICATE KEY UPDATE nav=:nav
                 """), {
                     "fcode": fund_code,
                     "start_date": start_date,
@@ -798,16 +790,22 @@ class AssetOperator:
             if not fund_code:
                 self.session.rollback()
                 return {"error": "找不到基金代码"}
-            self.session.execute(text("""
-                INSERT INTO fund_navs (fund_code, date, nav, currency)
-                VALUES (:fund_code, COALESCE(:date, CURDATE()), :nav, :currency)
-                ON DUPLICATE KEY UPDATE nav=:nav
-            """), {
-                "fund_code": fund_code,
-                "date": nav_date,
-                "nav": nav,
-                "currency": currency,
-            })
+            nav_exists = self.session.execute(text("""
+                SELECT 1
+                FROM fund_navs
+                WHERE fund_code=:fund_code
+                LIMIT 1
+            """), {"fund_code": fund_code}).scalar()
+            if not nav_exists:
+                self.session.execute(text("""
+                    INSERT INTO fund_navs (fund_code, date, nav, currency)
+                    VALUES (:fund_code, COALESCE(:date, CURDATE()), :nav, :currency)
+                """), {
+                    "fund_code": fund_code,
+                    "date": nav_date,
+                    "nav": nav,
+                    "currency": currency,
+                })
         self.session.commit()
         return {"status": "success", "message": f"基金产品 {id} 已更新"}
 

@@ -1,6 +1,9 @@
 # skills/operation_skill.py
+import logging
 from core.asset_operator import AssetOperator
 from services.fund_nav_fetcher import FundNavFetcher
+
+logger = logging.getLogger(__name__)
 class OperationSkill:
     def __init__(self, session):
 
@@ -11,6 +14,7 @@ class OperationSkill:
         统一操作入口，根据 action 调用 AssetOperator 的对应方法。
         所有 action 名称均为强语义，避免 LLM 误判。
         """
+        logger.info("operate action=%s params=%s", action, params)
 
         # ============================
         # 1. 账户操作（Account）
