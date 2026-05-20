@@ -11,32 +11,54 @@ class CashflowPage extends StatefulWidget {
 }
 
 class _CashflowPageState extends State<CashflowPage> {
-  late Future<List<dynamic>> _future;
+  late Future<_CashflowData> _future;
 
   @override
   void initState() {
     super.initState();
-    _future = ApiClient.getCashflows();
+    _future = _load();
+  }
+
+  Future<_CashflowData> _load() async {
+    final cashflows = await ApiClient.getCashflows();
+    final accounts = await ApiClient.getAccounts();
+
+    final Map<int, String> accountNames = {};
+    for (final row in accounts) {
+      final m = row as Map<String, dynamic>;
+      final id = (m['id'] as num).toInt();
+      final name = m['name'] as String? ?? '未命名账户';
+      accountNames[id] = name;
+    }
+
+    return _CashflowData(
+      cashflows: cashflows,
+      accountNames: accountNames,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: FutureBuilder<List<dynamic>>(
+      child: FutureBuilder<_CashflowData>(
         future: _future,
         builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (snapshot.hasError) {
-          return Center(
-            child: Text('加载失败: ${formatApiError(snapshot.error!)}'),
-          );
-        }
-          final rawData = snapshot.data ?? [];
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return Center(
+              child: Text('加载失败: ${formatApiError(snapshot.error!)}'),
+            );
+          }
+          final data = snapshot.data;
+          if (data == null) {
+            return const Center(child: Text('暂无数据'));
+          }
+          final rawData = data.cashflows;
           final now = DateTime.now();
           final today = DateTime(now.year, now.month, now.day);
-          final data = rawData
+          final rows = rawData
               .whereType<Map<String, dynamic>>()
               .where((row) {
                 final dateStr = row['date'];
@@ -56,15 +78,19 @@ class _CashflowPageState extends State<CashflowPage> {
               return aDate.compareTo(bDate);
             });
           return ListView.builder(
-            itemCount: data.length,
+            itemCount: rows.length,
             itemBuilder: (context, i) {
-              final row = data[i] as Map<String, dynamic>;
+              final row = rows[i] as Map<String, dynamic>;
               final amt = row['amount'];
               final dir = row['direction'];
               final color = dir == 'inflow' ? Colors.green : Colors.red;
+              final accountId = (row['account_id'] as num?)?.toInt();
+              final accountName = accountId == null
+                  ? '未知账户'
+                  : (data.accountNames[accountId] ?? '账户 $accountId');
               return ListTile(
                 title: Text('${row['date']}  ·  ${row['description'] ?? ''}'),
-                subtitle: Text('账户 ${row['account_id']}  ·  来源 ${row['source_type']}'),
+                subtitle: Text('账户 $accountName  ·  来源 ${row['source_type']}'),
                 trailing: Text(
                   amt.toString(),
                   style: TextStyle(color: color, fontWeight: FontWeight.bold),
@@ -76,4 +102,14 @@ class _CashflowPageState extends State<CashflowPage> {
       ),
     );
   }
+}
+
+class _CashflowData {
+  final List<dynamic> cashflows;
+  final Map<int, String> accountNames;
+
+  const _CashflowData({
+    required this.cashflows,
+    required this.accountNames,
+  });
 }
