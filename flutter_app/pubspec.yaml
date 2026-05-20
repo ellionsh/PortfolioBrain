@@ -1,5 +1,5 @@
-name: 智能资产管理
-description: 智能资产管理移动客户端
+name: ai_asset_management
+description: AI资产管理移动客户端
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
@@ -8,7 +8,7 @@ dependencies:
   flutter:
     sdk: flutter
   http: ^1.2.0
-  flutter_markdown: ^0.7.3
+  flutter_markdown_plus: any
   intl: ^0.20.2
   shared_preferences: ^2.3.3
 

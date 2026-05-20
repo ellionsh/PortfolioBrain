@@ -80,7 +80,7 @@ class _CashflowPageState extends State<CashflowPage> {
           return ListView.builder(
             itemCount: rows.length,
             itemBuilder: (context, i) {
-              final row = rows[i] as Map<String, dynamic>;
+              final row = rows[i];
               final amt = row['amount'];
               final dir = row['direction'];
               final color = dir == 'inflow' ? Colors.green : Colors.red;

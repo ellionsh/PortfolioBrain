@@ -55,17 +55,6 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
     return double.tryParse(value.toString());
   }
 
-  DateTime? _parseDate(dynamic value) {
-    if (value == null) return null;
-    final text = value.toString().trim();
-    if (text.isEmpty) return null;
-    try {
-      return DateTime.parse(text);
-    } catch (_) {
-      return null;
-    }
-  }
-
   String _formatNumber(double? value, {int fraction = 2}) {
     if (value == null) return '';
     return value.toStringAsFixed(fraction);
