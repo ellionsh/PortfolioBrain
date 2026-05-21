@@ -81,7 +81,7 @@ CREATE TABLE financial_transactions (
     trade_type VARCHAR(50),   -- buy/sell/dividend/fee
     shares DECIMAL(18,4),
     amount DECIMAL(18,2),
-    nav DECIMAL(18,4),
+    nav DECIMAL(18,6),
     fee DECIMAL(18,2),
     currency VARCHAR(10),
     INDEX idx_fin_tx_product (product_id),
@@ -92,7 +92,7 @@ CREATE TABLE financial_transactions (
 CREATE TABLE financial_navs (
     product_code VARCHAR(100),
     date DATE,
-    nav DECIMAL(18,4),
+    nav DECIMAL(18,6),
     currency VARCHAR(10),
     PRIMARY KEY (product_code, date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
