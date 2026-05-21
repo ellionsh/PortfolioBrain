@@ -1,66 +1,61 @@
 # tasks/job_update_fx_rates.py
 import datetime
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 
 import akshare as ak
 from sqlalchemy import text
 
 
-def _extract_mid_rate(row) -> Optional[float]:
+def _latest_boc_rate(symbol_cn: str, start_date: str, end_date: str) -> Optional[Tuple[datetime.date, float]]:
+    df = ak.currency_boc_sina(symbol=symbol_cn, start_date=start_date, end_date=end_date)
+    if df is None or df.empty:
+        return None
+    df = df.sort_values("日期")
+    row = df.iloc[-1]
+    rate = row.get("中行汇买价")
+    if rate is None:
+        return None
     try:
-        bid = row.get("买报价")
-        ask = row.get("卖报价")
-        if bid is None and ask is None:
-            return None
-        if bid is None:
-            return float(ask)
-        if ask is None:
-            return float(bid)
-        return (float(bid) + float(ask)) / 2
+        fx_date = datetime.datetime.strptime(str(row.get("日期")), "%Y-%m-%d").date()
+    except Exception:
+        try:
+            fx_date = datetime.datetime.strptime(str(row.get("日期")), "%Y%m%d").date()
+        except Exception:
+            fx_date = datetime.date.today()
+    try:
+        rate_value = float(rate) / 100.0
     except Exception:
         return None
+    return fx_date, rate_value
 
 
-def _parse_pair(pair: str):
-    if not pair:
-        return None, None
-    cleaned = str(pair).strip().upper().replace(" ", "")
-    if "/" in cleaned:
-        base, quote = cleaned.split("/", 1)
-        return base, quote
-    return None, None
+def fetch_fx_rates() -> Dict[str, Tuple[datetime.date, float]]:
+    today = datetime.date.today()
+    end_date = today.strftime("%Y%m%d")
+    start_date = (today - datetime.timedelta(days=200)).strftime("%Y%m%d")
 
+    mapping = {
+        "USD": "美元",
+        "EUR": "欧元",
+        "HKD": "港币",
+    }
 
-def fetch_fx_rates() -> Dict[str, float]:
-    df = ak.fx_spot_quote()
-    if df is None or df.empty:
-        return {}
-
-    wanted = {"USD", "EUR", "HKD"}
-    rates: Dict[str, float] = {}
-
-    for _, row in df.iterrows():
-        base, quote = _parse_pair(row.get("货币对"))
-        if base not in wanted:
+    results: Dict[str, Tuple[datetime.date, float]] = {}
+    for code, symbol_cn in mapping.items():
+        latest = _latest_boc_rate(symbol_cn, start_date, end_date)
+        if latest is None:
             continue
-        if quote not in {"CNY", "CNH"}:
-            continue
-        rate = _extract_mid_rate(row)
-        if rate is None:
-            continue
-        rates[base] = rate
-
-    return rates
+        results[code] = latest
+    return results
 
 
 def update_fx_rates(session):
-    today = datetime.date.today()
     rates = fetch_fx_rates()
     if not rates:
-        return {"status": "empty", "date": str(today)}
+        return {"status": "empty", "date": str(datetime.date.today())}
 
     with session.begin():
-        for base_currency, rate in rates.items():
+        for base_currency, (fx_date, rate) in rates.items():
             session.execute(
                 text(
                     """
@@ -69,7 +64,7 @@ def update_fx_rates(session):
                     ON DUPLICATE KEY UPDATE rate=:rate
                     """
                 ),
-                {"d": today, "base": base_currency, "rate": rate},
+                {"d": fx_date, "base": base_currency, "rate": rate},
             )
 
-    return {"status": "success", "date": str(today), "updated": list(rates.keys())}
+    return {"status": "success", "date": str(datetime.date.today()), "updated": list(rates.keys())}
