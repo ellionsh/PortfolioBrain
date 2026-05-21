@@ -674,6 +674,8 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
             final shares = _parseDouble(m['shares']);
             final nav = _parseDouble(m['nav']);
             final principal = _parseDouble(m['principal']);
+            final principalCny = _parseDouble(m['principal_cny']);
+            final marketValueCny = _parseDouble(m['market_value_cny']);
             double? marketValue;
             if (isNavProduct) {
               if (shares != null && nav != null) {
@@ -684,8 +686,11 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
                 marketValue = shares;
               }
             }
-            final yieldRate = (marketValue != null && principal != null && principal > 0)
-                ? (marketValue - principal) / principal
+            final displayMarketValue = marketValueCny ?? marketValue;
+            final displayPrincipal = principalCny ?? principal;
+            final yieldRate =
+                (displayMarketValue != null && displayPrincipal != null && displayPrincipal > 0)
+                    ? (displayMarketValue - displayPrincipal) / displayPrincipal
                 : null;
             final annualizedYield = _parseDouble(m['annualized_yield']);
 
@@ -698,11 +703,11 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
                     [
                       m['type'] ?? '',
                       m['product_code'] ?? '',
-                      if (principal != null) '成本 ${_formatNumber(principal)}',
+                      if (displayPrincipal != null) '成本 ${_formatNumber(displayPrincipal)}',
                       if (nav != null) '净值 ${_formatNav(nav)}',
                       if (shares != null) '份额 ${_formatNumber(shares)}',
-                      if (marketValue != null)
-                        '市值 ${_formatNumber(marketValue)}',
+                      if (displayMarketValue != null)
+                        '市值 ${_formatNumber(displayMarketValue)}',
                       if (yieldRate != null) '收益率 ${_formatPercent(yieldRate)}',
                       if (annualizedYield != null)
                         '年化 ${_formatPercent(annualizedYield)}',

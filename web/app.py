@@ -83,6 +83,34 @@ def _xirr(cashflows):
             f_low = f_mid
     return mid
 
+
+def _get_fx_rate_map(session):
+    df = pd.read_sql(text("""
+        SELECT r.base_currency, r.rate
+        FROM fx_rates r
+        JOIN (
+            SELECT base_currency, MAX(date) AS max_date
+            FROM fx_rates
+            WHERE quote_currency = 'CNY'
+            GROUP BY base_currency
+        ) latest
+          ON r.base_currency = latest.base_currency
+         AND r.date = latest.max_date
+        WHERE r.quote_currency = 'CNY'
+    """), session.bind)
+
+    rate_map = {"CNY": 1.0}
+    if df is not None and not df.empty:
+        for _, row in df.iterrows():
+            base = row.get("base_currency")
+            rate = row.get("rate")
+            if base and rate is not None:
+                try:
+                    rate_map[str(base).upper()] = float(rate)
+                except (TypeError, ValueError):
+                    continue
+    return rate_map
+
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import config
@@ -273,6 +301,7 @@ def get_insurance_products():
 @auth_required
 def get_financial_products():
     with session_scope() as session:
+        rate_map = _get_fx_rate_map(session)
         df = pd.read_sql(text("""
             SELECT fp.id, fp.account_id, fp.product_name, fp.product_code, fp.type,
                    fp.currency, fp.is_nav_based, fp.risk_level,
@@ -325,6 +354,9 @@ def get_financial_products():
                 is_nav_based = row.get("is_nav_based") in (1, True) or row.get("type") == "nav"
                 shares = row.get("shares")
                 nav = row.get("nav")
+                principal = row.get("principal")
+                currency = (row.get("currency") or "CNY").upper()
+                rate = rate_map.get(currency)
                 market_value = None
                 try:
                     if is_nav_based:
@@ -335,6 +367,18 @@ def get_financial_products():
                             market_value = float(shares)
                 except (TypeError, ValueError):
                     market_value = None
+                row["fx_rate"] = rate
+                if principal is not None and rate is not None:
+                    try:
+                        row["principal_cny"] = float(principal) * float(rate)
+                    except (TypeError, ValueError):
+                        row["principal_cny"] = None
+                else:
+                    row["principal_cny"] = None
+                if market_value is not None and rate is not None:
+                    row["market_value_cny"] = float(market_value) * float(rate)
+                else:
+                    row["market_value_cny"] = None
                 if market_value is not None:
                     cashflows.append((today, market_value))
                 row["annualized_yield"] = _xirr(cashflows) if cashflows else None
@@ -344,6 +388,7 @@ def get_financial_products():
 @auth_required
 def get_fund_products():
     with session_scope() as session:
+        rate_map = _get_fx_rate_map(session)
         df = pd.read_sql(text("""
             SELECT f.id, f.account_id, f.fund_name, f.fund_code, f.currency,
                    f.shares, f.principal, f.start_date, f.end_date,
@@ -394,12 +439,27 @@ def get_fund_products():
             cashflows = list(cashflow_map.get(fid, []))
             shares = row.get("shares")
             nav = row.get("nav")
+            principal = row.get("principal")
+            currency = (row.get("currency") or "CNY").upper()
+            rate = rate_map.get(currency)
             market_value = None
             try:
                 if shares is not None and nav is not None:
                     market_value = float(shares) * float(nav)
             except (TypeError, ValueError):
                 market_value = None
+            row["fx_rate"] = rate
+            if principal is not None and rate is not None:
+                try:
+                    row["principal_cny"] = float(principal) * float(rate)
+                except (TypeError, ValueError):
+                    row["principal_cny"] = None
+            else:
+                row["principal_cny"] = None
+            if market_value is not None and rate is not None:
+                row["market_value_cny"] = float(market_value) * float(rate)
+            else:
+                row["market_value_cny"] = None
             if market_value is not None:
                 cashflows.append((today, market_value))
             row["annualized_yield"] = _xirr(cashflows) if cashflows else None
@@ -457,13 +517,79 @@ def chat():
 @auth_required
 def summary():
     with session_scope() as session:
-        df_summary = pd.read_sql(text("SELECT * FROM asset_summary_view"), session.bind)
+        df_summary = pd.read_sql(text("""
+            SELECT
+                (SELECT COALESCE(SUM(principal),0)
+                 FROM bank_deposits
+                 WHERE status='active') AS bank_assets,
+                (SELECT COALESCE(SUM(fp.shares * fn.nav *
+                        CASE
+                            WHEN fp.currency IS NULL OR fp.currency='CNY' THEN 1
+                            WHEN lfx.rate IS NULL THEN NULL
+                            ELSE lfx.rate
+                        END
+                    ),0)
+                 FROM financial_products fp
+                 JOIN (
+                     SELECT product_code, MAX(date) AS latest_date
+                     FROM financial_navs
+                     GROUP BY product_code
+                 ) latest ON fp.product_code = latest.product_code
+                 JOIN financial_navs fn
+                   ON fn.product_code = latest.product_code AND fn.date = latest.latest_date
+                 LEFT JOIN (
+                     SELECT r.base_currency, r.rate
+                     FROM fx_rates r
+                     JOIN (
+                         SELECT base_currency, MAX(date) AS max_date
+                         FROM fx_rates
+                         WHERE quote_currency='CNY'
+                         GROUP BY base_currency
+                     ) latest_fx
+                       ON r.base_currency = latest_fx.base_currency
+                      AND r.date = latest_fx.max_date
+                     WHERE r.quote_currency='CNY'
+                 ) lfx ON lfx.base_currency = fp.currency
+                 WHERE fp.status='active') AS financial_assets,
+                (SELECT COALESCE(SUM(f.shares * fn.nav *
+                        CASE
+                            WHEN f.currency IS NULL OR f.currency='CNY' THEN 1
+                            WHEN lfx2.rate IS NULL THEN NULL
+                            ELSE lfx2.rate
+                        END
+                    ),0)
+                 FROM fund_products f
+                 JOIN (
+                     SELECT fund_code, MAX(date) AS latest_date
+                     FROM fund_navs
+                     GROUP BY fund_code
+                 ) latest ON f.fund_code = latest.fund_code
+                 JOIN fund_navs fn
+                   ON fn.fund_code = latest.fund_code AND fn.date = latest.latest_date
+                 LEFT JOIN (
+                     SELECT r.base_currency, r.rate
+                     FROM fx_rates r
+                     JOIN (
+                         SELECT base_currency, MAX(date) AS max_date
+                         FROM fx_rates
+                         WHERE quote_currency='CNY'
+                         GROUP BY base_currency
+                     ) latest_fx
+                       ON r.base_currency = latest_fx.base_currency
+                      AND r.date = latest_fx.max_date
+                     WHERE r.quote_currency='CNY'
+                 ) lfx2 ON lfx2.base_currency = f.currency
+                 WHERE f.status='active') AS fund_assets,
+                (SELECT COALESCE(SUM(cash_value),0)
+                 FROM insurance_products
+                 WHERE status='active') AS insurance_assets
+        """), session.bind)
 
         bank_value = float(df_summary["bank_assets"][0] or 0)
         financial_value = float(df_summary["financial_assets"][0] or 0)
         fund_value = float(df_summary["fund_assets"][0] or 0)
         insurance_value = float(df_summary["insurance_assets"][0] or 0)
-        total_assets = float(df_summary["total_assets"][0] or 0)
+        total_assets = bank_value + financial_value + fund_value + insurance_value
 
         df_cf = pd.read_sql(text("""
             SELECT COALESCE(SUM(amount),0) AS v 

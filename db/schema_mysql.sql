@@ -246,8 +246,14 @@ SELECT
      FROM bank_deposits 
      WHERE status='active') AS bank_assets,
 
-    -- 理财产品市值（份额 × 最新净值）
-    (SELECT COALESCE(SUM(fp.shares * fn.nav),0)
+    -- 理财产品市值（份额 × 最新净值，非 CNY 按汇率折算）
+    (SELECT COALESCE(SUM(fp.shares * fn.nav *
+            CASE
+                WHEN fp.currency IS NULL OR fp.currency='CNY' THEN 1
+                WHEN lfx.rate IS NULL THEN NULL
+                ELSE lfx.rate
+            END
+        ),0)
      FROM financial_products fp
      JOIN (
          SELECT product_code, MAX(date) AS latest_date
@@ -256,10 +262,29 @@ SELECT
      ) latest ON fp.product_code = latest.product_code
      JOIN financial_navs fn 
        ON fn.product_code = latest.product_code AND fn.date = latest.latest_date
+     LEFT JOIN (
+         SELECT r.base_currency, r.rate
+         FROM fx_rates r
+         JOIN (
+             SELECT base_currency, MAX(date) AS max_date
+             FROM fx_rates
+             WHERE quote_currency='CNY'
+             GROUP BY base_currency
+         ) latest_fx
+           ON r.base_currency = latest_fx.base_currency
+          AND r.date = latest_fx.max_date
+         WHERE r.quote_currency='CNY'
+     ) lfx ON lfx.base_currency = fp.currency
      WHERE fp.status='active') AS financial_assets,
 
-    -- 基金市值（份额 × 最新净值）
-    (SELECT COALESCE(SUM(f.shares * fn.nav),0)
+    -- 基金市值（份额 × 最新净值，非 CNY 按汇率折算）
+    (SELECT COALESCE(SUM(f.shares * fn.nav *
+            CASE
+                WHEN f.currency IS NULL OR f.currency='CNY' THEN 1
+                WHEN lfx2.rate IS NULL THEN NULL
+                ELSE lfx2.rate
+            END
+        ),0)
      FROM fund_products f
      JOIN (
          SELECT fund_code, MAX(date) AS latest_date
@@ -268,6 +293,19 @@ SELECT
      ) latest ON f.fund_code = latest.fund_code
      JOIN fund_navs fn 
        ON fn.fund_code = latest.fund_code AND fn.date = latest.latest_date
+     LEFT JOIN (
+         SELECT r.base_currency, r.rate
+         FROM fx_rates r
+         JOIN (
+             SELECT base_currency, MAX(date) AS max_date
+             FROM fx_rates
+             WHERE quote_currency='CNY'
+             GROUP BY base_currency
+         ) latest_fx
+           ON r.base_currency = latest_fx.base_currency
+          AND r.date = latest_fx.max_date
+         WHERE r.quote_currency='CNY'
+     ) lfx2 ON lfx2.base_currency = f.currency
      WHERE f.status='active') AS fund_assets,
 
     -- 保险现金价值
@@ -279,7 +317,13 @@ SELECT
     (
       (SELECT COALESCE(SUM(principal),0) FROM bank_deposits WHERE status='active')
       +
-      (SELECT COALESCE(SUM(fp.shares * fn.nav),0)
+      (SELECT COALESCE(SUM(fp.shares * fn.nav *
+            CASE
+                WHEN fp.currency IS NULL OR fp.currency='CNY' THEN 1
+                WHEN lfx.rate IS NULL THEN NULL
+                ELSE lfx.rate
+            END
+        ),0)
        FROM financial_products fp
        JOIN (
            SELECT product_code, MAX(date) AS latest_date
@@ -288,9 +332,28 @@ SELECT
        ) latest ON fp.product_code = latest.product_code
        JOIN financial_navs fn 
          ON fn.product_code = latest.product_code AND fn.date = latest.latest_date
+       LEFT JOIN (
+           SELECT r.base_currency, r.rate
+           FROM fx_rates r
+           JOIN (
+               SELECT base_currency, MAX(date) AS max_date
+               FROM fx_rates
+               WHERE quote_currency='CNY'
+               GROUP BY base_currency
+           ) latest_fx
+             ON r.base_currency = latest_fx.base_currency
+            AND r.date = latest_fx.max_date
+           WHERE r.quote_currency='CNY'
+       ) lfx ON lfx.base_currency = fp.currency
        WHERE fp.status='active')
       +
-      (SELECT COALESCE(SUM(f.shares * fn.nav),0)
+      (SELECT COALESCE(SUM(f.shares * fn.nav *
+            CASE
+                WHEN f.currency IS NULL OR f.currency='CNY' THEN 1
+                WHEN lfx2.rate IS NULL THEN NULL
+                ELSE lfx2.rate
+            END
+        ),0)
        FROM fund_products f
        JOIN (
            SELECT fund_code, MAX(date) AS latest_date
@@ -299,6 +362,19 @@ SELECT
        ) latest ON f.fund_code = latest.fund_code
        JOIN fund_navs fn 
          ON fn.fund_code = latest.fund_code AND fn.date = latest.latest_date
+       LEFT JOIN (
+           SELECT r.base_currency, r.rate
+           FROM fx_rates r
+           JOIN (
+               SELECT base_currency, MAX(date) AS max_date
+               FROM fx_rates
+               WHERE quote_currency='CNY'
+               GROUP BY base_currency
+           ) latest_fx
+             ON r.base_currency = latest_fx.base_currency
+            AND r.date = latest_fx.max_date
+           WHERE r.quote_currency='CNY'
+       ) lfx2 ON lfx2.base_currency = f.currency
        WHERE f.status='active')
       +
       (SELECT COALESCE(SUM(cash_value),0) FROM insurance_products WHERE status='active')

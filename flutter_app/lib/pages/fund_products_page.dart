@@ -715,11 +715,17 @@ class _FundProductsPageState extends State<FundProductsPage> {
             final shares = _parseDouble(row['shares']);
             final nav = _parseDouble(row['nav']);
             final principal = _parseDouble(row['principal']);
+            final principalCny = _parseDouble(row['principal_cny']);
+            final marketValueCny = _parseDouble(row['market_value_cny']);
             final marketValue =
                 (shares != null && nav != null) ? shares * nav : null;
+            final displayMarketValue = marketValueCny ?? marketValue;
+            final displayPrincipal = principalCny ?? principal;
             final yieldRate =
-                (marketValue != null && principal != null && principal > 0)
-                    ? (marketValue - principal) / principal
+                (displayMarketValue != null &&
+                        displayPrincipal != null &&
+                        displayPrincipal > 0)
+                    ? (displayMarketValue - displayPrincipal) / displayPrincipal
                     : null;
             final startDate = _parseDate(row['start_date']);
             double? annualizedYield;
@@ -738,11 +744,12 @@ class _FundProductsPageState extends State<FundProductsPage> {
                   Text(
                     [
                       row['fund_code'] ?? '',
-                      if (principal != null) '成本 ${_formatNumber(principal)}',
+                      if (displayPrincipal != null)
+                        '成本 ${_formatNumber(displayPrincipal)}',
                       if (nav != null) '净值 ${_formatNav(nav)}',
                       if (shares != null) '份额 ${_formatNumber(shares)}',
-                      if (marketValue != null)
-                        '市值 ${_formatNumber(marketValue)}',
+                      if (displayMarketValue != null)
+                        '市值 ${_formatNumber(displayMarketValue)}',
                       if (yieldRate != null) '收益率 ${_formatPercent(yieldRate)}',
                       if (annualizedYield != null)
                         '年化 ${_formatPercent(annualizedYield)}',
