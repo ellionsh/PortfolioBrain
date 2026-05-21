@@ -6,17 +6,14 @@ import akshare as ak
 from sqlalchemy import text
 
 
-def _extract_mid_rate(row) -> Optional[float]:
+def _extract_bank_buy_rate(row) -> Optional[float]:
     try:
-        bid = row.get("买报价")
-        ask = row.get("卖报价")
-        if bid is None and ask is None:
+        buy = row.get("银行买入价")
+        if buy is None:
+            buy = row.get("买入价")
+        if buy is None:
             return None
-        if bid is None:
-            return float(ask)
-        if ask is None:
-            return float(bid)
-        return (float(bid) + float(ask)) / 2
+        return float(buy)
     except Exception:
         return None
 
@@ -45,7 +42,7 @@ def fetch_fx_rates() -> Dict[str, float]:
             continue
         if quote not in {"CNY", "CNH"}:
             continue
-        rate = _extract_mid_rate(row)
+        rate = _extract_bank_buy_rate(row)
         if rate is None:
             continue
         rates[base] = rate
