@@ -20,6 +20,16 @@ class AssetOperator:
     def __init__(self, session):
         self.session = session
 
+    def _normalize_date_value(self, value):
+        if isinstance(value, str) and value.strip() == "":
+            return None
+        return value
+
+    def _normalize_date_fields(self, data, fields=("start_date", "end_date")):
+        for field in fields:
+            if field in data:
+                data[field] = self._normalize_date_value(data[field])
+
     def _get_product_code(self, product_id):
         return self.session.execute(
             text("SELECT product_code FROM financial_products WHERE id=:id"),
@@ -164,6 +174,8 @@ class AssetOperator:
     # --- 银行存款买入 ---
     def _buy_bank_deposit(self, account_id, deposit_type, principal, rate, start_date, end_date, currency="CNY", **kwargs):
         try:
+            start_date = self._normalize_date_value(start_date)
+            end_date = self._normalize_date_value(end_date)
             self.session.execute(text("""
                 INSERT INTO bank_deposits (
                     account_id, deposit_type, currency, principal, interest_rate,
@@ -462,6 +474,8 @@ class AssetOperator:
         status="active",
         remark=None,
     ):
+        start_date = self._normalize_date_value(start_date)
+        end_date = self._normalize_date_value(end_date)
         self.session.execute(text("""
             INSERT INTO insurance_products (
                 account_id, product_name, company, type, currency,
@@ -499,6 +513,7 @@ class AssetOperator:
             "premium", "premium_freq", "premium_years", "coverage_amount",
             "start_date", "end_date", "cash_value", "status", "remark"
         ]
+        self._normalize_date_fields(kwargs)
         for key in allowed_fields:
             if key in kwargs:
                 fields.append(f"{key} = :{key}")
@@ -540,10 +555,8 @@ class AssetOperator:
         status="active",
         remark=None,
     ):
-        if start_date == "":
-            start_date = None
-        if end_date == "":
-            end_date = None
+        start_date = self._normalize_date_value(start_date)
+        end_date = self._normalize_date_value(end_date)
         if isinstance(risk_level, str) and risk_level.strip() == "":
             risk_level = None
         if not is_nav_based and shares is None and principal is not None:
@@ -628,10 +641,7 @@ class AssetOperator:
     def update_financial_product(self, id, **kwargs):
         nav = kwargs.pop("nav", None)
         currency = kwargs.get("currency", "CNY")
-        if kwargs.get("start_date") == "":
-            kwargs["start_date"] = None
-        if kwargs.get("end_date") == "":
-            kwargs["end_date"] = None
+        self._normalize_date_fields(kwargs)
         if isinstance(kwargs.get("risk_level"), str) and kwargs["risk_level"].strip() == "":
             kwargs["risk_level"] = None
         fields = []
@@ -684,8 +694,8 @@ class AssetOperator:
     def create_fund_product(self, account_id, fund_name, fund_code, currency="CNY",
                             shares=0, principal=0, nav=None, start_date=None,
                             end_date=None, status="active", remark=None):
-        start_date = start_date or None
-        end_date = end_date or None
+        start_date = self._normalize_date_value(start_date)
+        end_date = self._normalize_date_value(end_date)
         if isinstance(remark, str) and remark.strip() == "":
             remark = None
         self.session.execute(text("""
@@ -763,10 +773,7 @@ class AssetOperator:
     def update_fund_product(self, id, **kwargs):
         nav = kwargs.pop("nav", None)
         currency = kwargs.get("currency", "CNY")
-        if kwargs.get("start_date") == "":
-            kwargs["start_date"] = None
-        if kwargs.get("end_date") == "":
-            kwargs["end_date"] = None
+        self._normalize_date_fields(kwargs)
         nav_date = kwargs.get("start_date")
         fields, params = [], {"id": id}
         allowed = ["account_id", "fund_name", "fund_code", "currency",
@@ -902,6 +909,8 @@ class AssetOperator:
                         start_date, end_date, currency="CNY", **kwargs):
         """增加一笔银行存款"""
         try:
+            start_date = self._normalize_date_value(start_date)
+            end_date = self._normalize_date_value(end_date)
             self.session.execute(text("""
                 INSERT INTO bank_deposits (
                     account_id, deposit_type, currency, principal, interest_rate,
@@ -975,7 +984,7 @@ class AssetOperator:
                 "start_date", "end_date", "interest_method", "notice_days",
                 "auto_renew", "status", "remark"
             ]
-
+            self._normalize_date_fields(kwargs)
             for key in allowed_fields:
                 if key in kwargs:
                     fields.append(f"{key} = :{key}")
