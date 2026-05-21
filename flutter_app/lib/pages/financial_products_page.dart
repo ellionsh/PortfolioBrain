@@ -60,6 +60,8 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
     return value.toStringAsFixed(fraction);
   }
 
+  String _formatNav(double? value) => _formatNumber(value, fraction: 6);
+
   String _formatPercent(double? value, {int fraction = 2}) {
     if (value == null) return '';
     return '${(value * 100).toStringAsFixed(fraction)}%';
@@ -103,8 +105,9 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
     );
     final principalController =
         TextEditingController(text: product?['principal']?.toString() ?? '');
-    final navController =
-        TextEditingController(text: product?['nav']?.toString() ?? '');
+    final navController = TextEditingController(
+      text: _formatNav(_parseDouble(product?['nav'])),
+    );
     final sharesController =
         TextEditingController(text: product?['shares']?.toString() ?? '');
     final expectedYieldController = TextEditingController(
@@ -333,8 +336,9 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
   Future<void> _buyProduct(Map<String, dynamic> product) async {
     final isNavProduct = _isNavProduct(product);
     final amountController = TextEditingController();
-    final navController =
-        TextEditingController(text: product['nav']?.toString() ?? '');
+    final navController = TextEditingController(
+      text: _formatNav(_parseDouble(product['nav'])),
+    );
     final dateController = TextEditingController(text: _today());
 
     final confirmed = await showDialog<bool>(
@@ -458,8 +462,9 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
     final isNavProduct = _isNavProduct(product);
     final sharesController =
         TextEditingController(text: product['shares']?.toString() ?? '');
-    final navController =
-        TextEditingController(text: product['nav']?.toString() ?? '');
+    final navController = TextEditingController(
+      text: _formatNav(_parseDouble(product['nav'])),
+    );
     final amountController =
         TextEditingController(text: product['principal']?.toString() ?? '');
     final dateController = TextEditingController(text: _today());
@@ -694,7 +699,7 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
                       m['type'] ?? '',
                       m['product_code'] ?? '',
                       if (principal != null) '成本 ${_formatNumber(principal)}',
-                      if (nav != null) '净值 ${_formatNumber(nav)}',
+                      if (nav != null) '净值 ${_formatNav(nav)}',
                       if (shares != null) '份额 ${_formatNumber(shares)}',
                       if (marketValue != null)
                         '市值 ${_formatNumber(marketValue)}',

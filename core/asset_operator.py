@@ -1,5 +1,5 @@
 import datetime
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from sqlalchemy import text
 
 class AssetOperator:
@@ -24,6 +24,15 @@ class AssetOperator:
         if isinstance(value, str) and value.strip() == "":
             return None
         return value
+
+    def _normalize_nav_value(self, value):
+        if value is None or (isinstance(value, str) and value.strip() == ""):
+            return None
+        try:
+            nav_dec = value if isinstance(value, Decimal) else Decimal(str(value))
+        except (InvalidOperation, TypeError, ValueError):
+            return value
+        return nav_dec.quantize(Decimal("0.000001"), rounding=ROUND_HALF_UP)
 
     def _normalize_date_fields(self, data, fields=("start_date", "end_date")):
         for field in fields:
@@ -76,7 +85,9 @@ class AssetOperator:
 
     # --- 净值型理财买入 ---
     def _buy_nav_financial(self, product_id, account_id, amount, nav, date):
-        shares = amount / nav
+        nav = self._normalize_nav_value(nav)
+        amount_dec = amount if isinstance(amount, Decimal) else Decimal(str(amount))
+        shares = amount_dec / nav if nav not in (None, 0, Decimal("0")) else Decimal("0")
         # 插入交易记录
         self.session.execute(text("""
             INSERT INTO financial_transactions (
@@ -84,7 +95,7 @@ class AssetOperator:
                 shares, amount, nav, currency
             ) VALUES (:pid, :aid, :date, 'buy', :shares, :amount, :nav, 'CNY')
         """), {"pid": product_id, "aid": account_id, "date": date,
-            "shares": shares, "amount": amount, "nav": nav})
+            "shares": shares, "amount": amount_dec, "nav": nav})
         # 更新产品份额
         self.session.execute(text("""
             UPDATE financial_products
@@ -240,7 +251,9 @@ class AssetOperator:
 
     # --- 净值型理财赎回 ---
     def _sell_nav_financial(self, product_id, account_id, shares, nav, date):
-        amount = shares * nav
+        nav = self._normalize_nav_value(nav)
+        shares_dec = shares if isinstance(shares, Decimal) else Decimal(str(shares))
+        amount = shares_dec * nav if nav not in (None, 0, Decimal("0")) else Decimal("0")
         row = self.session.execute(text("""
             SELECT shares, principal
             FROM financial_products
@@ -279,7 +292,7 @@ class AssetOperator:
                 shares, amount, nav, currency
             ) VALUES (:pid, :aid, :date, 'sell', :shares, :amount, :nav, 'CNY')
         """), {"pid": product_id, "aid": account_id, "date": date,
-            "shares": shares, "amount": amount, "nav": nav})
+            "shares": shares_dec, "amount": amount, "nav": nav})
         # 更新产品份额
         self.session.execute(text("""
             UPDATE financial_products
@@ -287,7 +300,7 @@ class AssetOperator:
                 principal = COALESCE(principal,0) - :principal_reduction
             WHERE id=:pid
         """), {
-            "shares": shares,
+            "shares": shares_dec,
             "principal_reduction": principal_reduction,
             "pid": product_id,
         })
@@ -396,6 +409,7 @@ class AssetOperator:
     # 3. 更新净值
     # ============================
     def update_nav(self, product_id=None, product_code=None, date=None, nav=None):
+        nav = self._normalize_nav_value(nav)
         if product_code is None:
             if product_id is None:
                 return {"error": "缺少产品代码或ID"}
@@ -557,6 +571,7 @@ class AssetOperator:
     ):
         start_date = self._normalize_date_value(start_date)
         end_date = self._normalize_date_value(end_date)
+        nav = self._normalize_nav_value(nav)
         if isinstance(risk_level, str) and risk_level.strip() == "":
             risk_level = None
         if not is_nav_based and shares is None and principal is not None:
@@ -639,7 +654,7 @@ class AssetOperator:
         }
 
     def update_financial_product(self, id, **kwargs):
-        nav = kwargs.pop("nav", None)
+        nav = self._normalize_nav_value(kwargs.pop("nav", None))
         currency = kwargs.get("currency", "CNY")
         self._normalize_date_fields(kwargs)
         if isinstance(kwargs.get("risk_level"), str) and kwargs["risk_level"].strip() == "":
