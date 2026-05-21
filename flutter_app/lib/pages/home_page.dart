@@ -60,9 +60,10 @@ class _HomePageState extends State<HomePage> {
       final shares = (m['shares'] as num?)?.toDouble() ?? 0;
       final nav = (m['nav'] as num?)?.toDouble();
       final amount = nav == null ? principal : shares * nav;
+      final amountCny = (m['market_value_cny'] as num?)?.toDouble() ?? amount;
       addAsset(
         (m['account_id'] as num?)?.toInt(),
-        amount,
+        amountCny,
         _AssetKind.financial,
       );
     }
@@ -84,9 +85,10 @@ class _HomePageState extends State<HomePage> {
       final shares = (m['shares'] as num?)?.toDouble() ?? 0;
       final nav = (m['nav'] as num?)?.toDouble();
       final amount = nav == null ? principal : shares * nav;
+      final amountCny = (m['market_value_cny'] as num?)?.toDouble() ?? amount;
       addAsset(
         (m['account_id'] as num?)?.toInt(),
-        amount,
+        amountCny,
         _AssetKind.fund,
       );
     }
