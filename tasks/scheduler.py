@@ -7,6 +7,7 @@ from tasks.job_update_nav import update_nav
 from tasks.job_update_fund_navs import update_fund_navs
 from tasks.job_generate_cashflows import generate_cashflows
 from tasks.job_maturity_alert import maturity_alert
+from tasks.job_update_fx_rates import update_fx_rates
 
 def job_update_nav():
     print("执行：更新净值")
@@ -27,11 +28,17 @@ def job_alert():
     with session_scope() as session:
         print(maturity_alert(session))
 
+def job_update_fx():
+    print("执行：更新汇率")
+    with session_scope() as session:
+        print(update_fx_rates(session))
+
 # 每日任务
 schedule.every().day.at("06:00").do(job_update_nav)
 schedule.every().day.at("06:05").do(job_update_fund_navs)
 schedule.every().day.at("06:10").do(job_generate_cf)
 schedule.every().day.at("06:20").do(job_alert)
+schedule.every().day.at("06:30").do(job_update_fx)
 
 print("任务调度器已启动...")
 
