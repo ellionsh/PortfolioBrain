@@ -219,13 +219,7 @@ class _HomePageState extends State<HomePage> {
           subtitle: Text(
             '资产: ${breakdown.total.toStringAsFixed(2)} · 占比 ${(ratio * 100).toStringAsFixed(1)}%\n${breakdown.summaryText}',
           ),
-          trailing: SizedBox(
-            width: 120,
-            child: LinearProgressIndicator(
-              value: ratio,
-              minHeight: 6,
-            ),
-          ),
+          trailing: null,
         );
       }).toList(),
     );
