@@ -18,6 +18,19 @@ class _HomePageState extends State<HomePage> {
     _future = _load();
   }
 
+  String _todayStr() {
+    final now = DateTime.now();
+    return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+  }
+
+  double _marketValueCny(Map<String, dynamic> m) {
+    final principal = (m['principal'] as num?)?.toDouble() ?? 0;
+    final shares = (m['shares'] as num?)?.toDouble() ?? 0;
+    final nav = (m['nav'] as num?)?.toDouble();
+    final amount = nav == null ? principal : shares * nav;
+    return (m['market_value_cny'] as num?)?.toDouble() ?? amount;
+  }
+
   Future<_DashboardData> _load() async {
     final summary = await ApiClient.getSummary();
     final accounts = await ApiClient.getAccounts();
@@ -25,6 +38,8 @@ class _HomePageState extends State<HomePage> {
     final financialProducts = await ApiClient.getFinancialProducts();
     final insuranceProducts = await ApiClient.getInsurance();
     final fundProducts = await ApiClient.getFundProducts();
+
+    final todayStr = _todayStr();
 
     final Map<int, String> accountNames = {};
     for (final row in accounts) {
@@ -45,22 +60,38 @@ class _HomePageState extends State<HomePage> {
       breakdown.add(kind, amount);
     }
 
+    double totalDeposit = 0;
+    double totalFinancial = 0;
+    double totalInsurance = 0;
+    double totalFund = 0;
+    double availableDeposit = 0;
+    double availableFinancial = 0;
+    double availableFund = 0;
+
     for (final row in deposits) {
       final m = row as Map<String, dynamic>;
+      final depositType = m['deposit_type'] as String?;
+      final endDate = m['end_date'] as String?;
+      final principal = (m['principal'] as num?)?.toDouble() ?? 0;
+      totalDeposit += principal;
+      if (depositType == '活期' || depositType == 'demand' || endDate == null || endDate.compareTo(todayStr) <= 0) {
+        availableDeposit += principal;
+      }
       addAsset(
         (m['account_id'] as num?)?.toInt(),
-        (m['principal'] as num?)?.toDouble() ?? 0,
+        principal,
         _AssetKind.deposit,
       );
     }
 
     for (final row in financialProducts) {
       final m = row as Map<String, dynamic>;
-      final principal = (m['principal'] as num?)?.toDouble() ?? 0;
-      final shares = (m['shares'] as num?)?.toDouble() ?? 0;
-      final nav = (m['nav'] as num?)?.toDouble();
-      final amount = nav == null ? principal : shares * nav;
-      final amountCny = (m['market_value_cny'] as num?)?.toDouble() ?? amount;
+      final endDate = m['end_date'] as String?;
+      final amountCny = _marketValueCny(m);
+      totalFinancial += amountCny;
+      if (endDate == null || endDate.compareTo(todayStr) <= 0) {
+        availableFinancial += amountCny;
+      }
       addAsset(
         (m['account_id'] as num?)?.toInt(),
         amountCny,
@@ -72,20 +103,23 @@ class _HomePageState extends State<HomePage> {
       final m = row as Map<String, dynamic>;
       final cashValue = (m['cash_value'] as num?)?.toDouble();
       final premium = (m['premium'] as num?)?.toDouble() ?? 0;
+      final value = cashValue ?? premium;
+      totalInsurance += value;
       addAsset(
         (m['account_id'] as num?)?.toInt(),
-        cashValue ?? premium,
+        value,
         _AssetKind.insurance,
       );
     }
 
     for (final row in fundProducts) {
       final m = row as Map<String, dynamic>;
-      final principal = (m['principal'] as num?)?.toDouble() ?? 0;
-      final shares = (m['shares'] as num?)?.toDouble() ?? 0;
-      final nav = (m['nav'] as num?)?.toDouble();
-      final amount = nav == null ? principal : shares * nav;
-      final amountCny = (m['market_value_cny'] as num?)?.toDouble() ?? amount;
+      final endDate = m['end_date'] as String?;
+      final amountCny = _marketValueCny(m);
+      totalFund += amountCny;
+      if (endDate == null || endDate.compareTo(todayStr) <= 0) {
+        availableFund += amountCny;
+      }
       addAsset(
         (m['account_id'] as num?)?.toInt(),
         amountCny,
@@ -95,7 +129,14 @@ class _HomePageState extends State<HomePage> {
 
     return _DashboardData(
       totalAssets: (summary['total_assets'] as num?)?.toDouble() ?? 0,
-      future6mCf: (summary['future_6m_cf'] as num?)?.toDouble() ?? 0,
+      future6mCf: availableDeposit + availableFinancial + availableFund,
+      totalDeposit: totalDeposit,
+      totalFinancial: totalFinancial,
+      totalInsurance: totalInsurance,
+      totalFund: totalFund,
+      availableDeposit: availableDeposit,
+      availableFinancial: availableFinancial,
+      availableFund: availableFund,
       assetsByAccount: byAccount,
       accountNames: accountNames,
     );
@@ -141,55 +182,56 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildSummaryCards(_DashboardData d) {
-    final cfColor = d.future6mCf >= 0 ? Colors.green : Colors.red;
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
-          child: Card(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('总资产',
-                      style:
-                          TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  Text(
-                    d.totalAssets.toStringAsFixed(2),
-                    style: const TextStyle(
-                        fontSize: 20, fontWeight: FontWeight.w600),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          child: _assetCard('总资产', d.totalAssets.toStringAsFixed(2), null, [
+            '存款 ${d.totalDeposit.toStringAsFixed(2)}',
+            '理财 ${d.totalFinancial.toStringAsFixed(2)}',
+            '保险 ${d.totalInsurance.toStringAsFixed(2)}',
+            '基金 ${d.totalFund.toStringAsFixed(2)}',
+          ]),
         ),
         const SizedBox(width: 12),
         Expanded(
-          child: Card(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('未来6个月现金流',
-                      style:
-                          TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  Text(
-                    d.future6mCf.toStringAsFixed(2),
-                    style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
-                        color: cfColor),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          child: _assetCard('1天内可用资金', d.future6mCf.toStringAsFixed(2),
+              d.future6mCf >= 0 ? Colors.green : Colors.red, [
+            '存款 ${d.availableDeposit.toStringAsFixed(2)}',
+            '理财 ${d.availableFinancial.toStringAsFixed(2)}',
+            '保险 ${d.availableInsurance.toStringAsFixed(2)}',
+            '基金 ${d.availableFund.toStringAsFixed(2)}',
+          ]),
         ),
       ],
+    );
+  }
+
+  Widget _assetCard(String title, String value, Color? valueColor, List<String> breakdowns) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title,
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Text(
+              value,
+              style: TextStyle(
+                  fontSize: 20, fontWeight: FontWeight.w600, color: valueColor),
+            ),
+            const Divider(height: 16),
+            for (final line in breakdowns)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(line,
+                    style: const TextStyle(fontSize: 12, color: Colors.grey)),
+              ),
+          ],
+        ),
+      ),
     );
   }
   Widget _buildDistributionList(_DashboardData d) {
@@ -231,15 +273,30 @@ class _HomePageState extends State<HomePage> {
 class _DashboardData {
   final double totalAssets;
   final double future6mCf;
+  final double totalDeposit;
+  final double totalFinancial;
+  final double totalInsurance;
+  final double totalFund;
+  final double availableDeposit;
+  final double availableFinancial;
+  final double availableInsurance;
+  final double availableFund;
   final Map<int, _AccountAssetBreakdown> assetsByAccount;
   final Map<int, String> accountNames;
 
   _DashboardData({
     required this.totalAssets,
     required this.future6mCf,
+    required this.totalDeposit,
+    required this.totalFinancial,
+    required this.totalInsurance,
+    required this.totalFund,
+    required this.availableDeposit,
+    required this.availableFinancial,
+    required this.availableFund,
     required this.assetsByAccount,
     required this.accountNames,
-  });
+  }) : availableInsurance = 0;
 }
 
 enum _AssetKind {
