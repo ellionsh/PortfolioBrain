@@ -39,19 +39,22 @@ class _CashflowPageState extends State<CashflowPage> {
     return (m['market_value_cny'] as num?)?.toDouble() ?? amount;
   }
 
+  double? _parseDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.toDouble();
+    return double.tryParse(value.toString());
+  }
+
   String? _yieldStr(Map<String, dynamic> m, {bool isBank = false}) {
+    // Only show actual annualized yield (XIRR), same as product detail pages.
     if (isBank) {
-      final rate = m['interest_rate'] as num?;
+      final rate = _parseDouble(m['interest_rate']);
       if (rate == null) return null;
-      return '${(rate.toDouble() * 100).toStringAsFixed(2)}%';
+      return '${(rate * 100).toStringAsFixed(2)}%';
     }
-    final annualized = m['annualized_yield'] as num?;
+    final annualized = _parseDouble(m['annualized_yield']);
     if (annualized != null) {
-      return '${(annualized.toDouble() * 100).toStringAsFixed(2)}%';
-    }
-    final expected = m['expected_yield'] as num?;
-    if (expected != null) {
-      return '${(expected.toDouble() * 100).toStringAsFixed(2)}%';
+      return '${(annualized * 100).toStringAsFixed(2)}%';
     }
     return null;
   }

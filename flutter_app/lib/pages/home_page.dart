@@ -217,17 +217,24 @@ class _HomePageState extends State<HomePage> {
             Text(title,
                 style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            Text(
-              value,
-              style: TextStyle(
-                  fontSize: 20, fontWeight: FontWeight.w600, color: valueColor),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                value,
+                style: TextStyle(
+                    fontSize: 20, fontWeight: FontWeight.w600, color: valueColor),
+              ),
             ),
             const Divider(height: 16),
             for (final line in breakdowns)
               Padding(
                 padding: const EdgeInsets.only(top: 2),
-                child: Text(line,
-                    style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(line,
+                      style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                ),
               ),
           ],
         ),
