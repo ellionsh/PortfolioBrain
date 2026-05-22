@@ -7,6 +7,7 @@ import pandas as pd
 from skills.operation_skill import OperationSkill
 from services.fund_nav_fetcher import FundNavFetcher
 from sqlalchemy import text
+from sqlalchemy.exc import OperationalError, InterfaceError, DBAPIError
 
 def serialize(obj):
     if obj is None:
@@ -110,6 +111,34 @@ def _get_fx_rate_map(session):
                 except (TypeError, ValueError):
                     continue
     return rate_map
+
+
+def _is_db_connection_error(exc: Exception) -> bool:
+    if isinstance(exc, (OperationalError, InterfaceError)):
+        return True
+    if isinstance(exc, DBAPIError) and exc.connection_invalidated:
+        return True
+    msg = str(exc).lower()
+    indicators = [
+        "can't connect",
+        "connection refused",
+        "connection timed out",
+        "lost connection",
+        "server has gone away",
+        "unknown server host",
+        "name or service not known",
+        "host is unreachable",
+        "connection error",
+    ]
+    return any(indicator in msg for indicator in indicators)
+
+
+def _db_connection_tip() -> str:
+    return (
+        "当前数据库连接出现了问题。若 MySQL 与服务不在同一台服务器，"
+        "请确认 PB_DB_HOST/PB_DB_PORT 配置正确，并确保 MySQL 允许远程连接"
+        "（bind-address、用户授权）。"
+    )
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -507,7 +536,12 @@ def get_financial_transactions():
 @auth_required
 def chat():
     q = request.json.get("query", "")
-    return jsonify({"response": agent_chat(q)})
+    try:
+        return jsonify({"response": agent_chat(q)})
+    except Exception as exc:
+        if _is_db_connection_error(exc):
+            return jsonify({"error": _db_connection_tip()}), 500
+        return jsonify({"error": f"Chat 处理失败: {exc}"}), 500
 
 
 # ============================

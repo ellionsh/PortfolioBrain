@@ -10,6 +10,7 @@ import config
 import datetime
 import time
 from sqlalchemy import text
+from sqlalchemy.exc import OperationalError, InterfaceError, DBAPIError
 from decimal import Decimal
 
 def serialize(obj):
@@ -377,6 +378,33 @@ def call_tool(name, args):
         return {"error": "unsupported product_type"}
     return {"error": "unknown tool"}
 
+def _is_db_connection_error(exc: Exception) -> bool:
+    if isinstance(exc, (OperationalError, InterfaceError)):
+        return True
+    if isinstance(exc, DBAPIError) and exc.connection_invalidated:
+        return True
+    msg = str(exc).lower()
+    indicators = [
+        "can't connect",
+        "connection refused",
+        "connection timed out",
+        "lost connection",
+        "server has gone away",
+        "unknown server host",
+        "name or service not known",
+        "host is unreachable",
+        "connection error",
+    ]
+    return any(indicator in msg for indicator in indicators)
+
+
+def _db_connection_tip() -> str:
+    return (
+        "当前数据库连接出现了问题。若 MySQL 与服务不在同一台服务器，"
+        "请确认 PB_DB_HOST/PB_DB_PORT 配置正确，并确保 MySQL 允许远程连接"
+        "（bind-address、用户授权）。"
+    )
+
 
 def agent_chat(user_query: str) -> str:
     messages = [
@@ -390,7 +418,7 @@ def agent_chat(user_query: str) -> str:
             model=config.DEEPSEEK_MODEL,
             messages=messages,
             tools=tools,
-            extra_body={"thinking": {"type": "disabled"}}
+            # extra_body={"thinking": {"type": "disabled"}}
         )
         print("LLM 耗时:", time.time() - t0)
 
@@ -408,7 +436,13 @@ def agent_chat(user_query: str) -> str:
             for call in msg.tool_calls:
                 name = call.function.name
                 args = json.loads(call.function.arguments)
-                result = call_tool(name, args)
+                try:
+                    result = call_tool(name, args)
+                except Exception as exc:
+                    if _is_db_connection_error(exc):
+                        result = {"error": _db_connection_tip()}
+                    else:
+                        result = {"error": f"工具调用失败: {exc}"}
                 result = serialize(result)
 
                 messages.append({
