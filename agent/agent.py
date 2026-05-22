@@ -431,6 +431,12 @@ def agent_chat(user_query: str) -> str:
                 "content": msg.content,
                 "tool_calls": msg.tool_calls
             }
+            reasoning_content = getattr(msg, "reasoning_content", None)
+            if reasoning_content:
+                assistant_msg["reasoning_content"] = reasoning_content
+            reasoning = getattr(msg, "reasoning", None)
+            if reasoning:
+                assistant_msg["reasoning"] = reasoning
             messages.append(assistant_msg)
 
             for call in msg.tool_calls:
