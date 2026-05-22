@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../utils/error_format.dart';
@@ -45,12 +46,52 @@ class _CashflowPageState extends State<CashflowPage> {
     return double.tryParse(value.toString());
   }
 
-  String? _yieldStr(Map<String, dynamic> m, {bool isBank = false}) {
-    // Only show actual annualized yield (XIRR), same as product detail pages.
+  DateTime? _parseDate(dynamic value) {
+    if (value == null) return null;
+    final text = value.toString().trim();
+    if (text.isEmpty) return null;
+    try {
+      return DateTime.parse(text);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  double? _annualizedYieldForFund(Map<String, dynamic> m) {
+    final shares = _parseDouble(m['shares']);
+    final nav = _parseDouble(m['nav']);
+    final principal = _parseDouble(m['principal']);
+    final principalCny = _parseDouble(m['principal_cny']);
+    final marketValueCny = _parseDouble(m['market_value_cny']);
+    final marketValue = (shares != null && nav != null) ? shares * nav : null;
+    final displayMarketValue = marketValueCny ?? marketValue;
+    final displayPrincipal = principalCny ?? principal;
+    final yieldRate =
+        (displayMarketValue != null && displayPrincipal != null && displayPrincipal > 0)
+            ? (displayMarketValue - displayPrincipal) / displayPrincipal
+            : null;
+    final startDate = _parseDate(m['start_date']);
+    if (yieldRate != null && startDate != null && yieldRate > -1) {
+      final days = DateTime.now().difference(startDate).inDays;
+      if (days > 0) {
+        return math.pow(1 + yieldRate, 365 / days) - 1;
+      }
+    }
+    return null;
+  }
+
+  String? _yieldStr(Map<String, dynamic> m, {bool isBank = false, bool isFund = false}) {
     if (isBank) {
       final rate = _parseDouble(m['interest_rate']);
       if (rate == null) return null;
       return '${(rate * 100).toStringAsFixed(2)}%';
+    }
+    if (isFund) {
+      final annualized = _annualizedYieldForFund(m);
+      if (annualized != null) {
+        return '${(annualized * 100).toStringAsFixed(2)}%';
+      }
+      return null;
     }
     final annualized = _parseDouble(m['annualized_yield']);
     if (annualized != null) {
@@ -154,7 +195,7 @@ class _CashflowPageState extends State<CashflowPage> {
         name: m['fund_name'] as String? ?? '基金产品',
         value: val,
         endDate: endDate,
-        yieldStr: _yieldStr(m),
+        yieldStr: _yieldStr(m, isFund: true),
         type: '基金',
       ));
     }

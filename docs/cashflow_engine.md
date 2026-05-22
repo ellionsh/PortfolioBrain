@@ -10,11 +10,11 @@ CashflowEngine 是 PortfolioBrain 的“心脏”，自动生成未来现金流�
 | 保险产品 | 缴费 |
 ---
 ## 运行方式
-python tasks/job_generate_cashflows.py
+`python tasks/job_generate_cashflows.py`
 或由自动任务系统每日执行。
 
 代码位置
-core/cashflow_engine.py
+`core/cashflow_engine.py`
 ---
 ## 幂等性
 重复运行不会重复生成现金流。
