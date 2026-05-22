@@ -3,6 +3,8 @@
 data
 *.bak
 portfolio.sock
+CLAUDE.md
+flutter_app/pubspec.lock
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
