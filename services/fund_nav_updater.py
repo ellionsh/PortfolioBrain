@@ -32,7 +32,7 @@ class FundNavUpdater:
         base_sleep_seconds = max(0.1, config.FUND_NAV_RETRY_BASE_SECONDS)
         for attempt in range(1, attempts + 1):
             try:
-                df = ak.fund_open_fund_info_em(symbol=code, indicator="单位净值走势")
+                df = ak.fund_open_fund_info_em(symbol=code, indicator="单位净值走势", period='1月')
                 if df is None or df.empty:
                     raise ValueError("获取净值结果为空")
                 latest = df.iloc[-1]
