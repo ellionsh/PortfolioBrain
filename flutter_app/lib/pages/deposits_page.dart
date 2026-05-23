@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../utils/error_format.dart';
 import '../api/api_client.dart';
+import '../theme/app_text_styles.dart';
 
 class DepositsPage extends StatefulWidget {
   const DepositsPage({super.key});
@@ -284,7 +285,7 @@ class _DepositsPageState extends State<DepositsPage> {
                     const Expanded(
                       child: Text(
                         '资产明细',
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                        style: AppTextStyles.pageTitle,
                       ),
                     ),
                     IconButton.filled(
@@ -324,7 +325,7 @@ class _DepositsPageState extends State<DepositsPage> {
         return ExpansionTile(
           title: Text(
             name,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            style: AppTextStyles.sectionTitle,
           ),
           children: items.map((m) {
             final principal = (m['principal'] as num?)?.toDouble() ?? 0;

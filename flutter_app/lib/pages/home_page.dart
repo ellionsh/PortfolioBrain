@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../api/api_client.dart';
 import '../utils/error_format.dart';
+import '../theme/app_text_styles.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -160,17 +161,11 @@ class _HomePageState extends State<HomePage> {
             padding: const EdgeInsets.all(16),
             child: ListView(
               children: [
-                const Text(
-                  '资产总览',
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                ),
+                const Text('资产总览', style: AppTextStyles.pageTitle),
                 const SizedBox(height: 16),
                 _buildSummaryCards(data),
                 const SizedBox(height: 24),
-                const Text(
-                  '资产分布（按账户）',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
+                const Text('资产分布（按账户）', style: AppTextStyles.sectionTitle),
                 const SizedBox(height: 8),
                 _buildDistributionList(data),
               ],
@@ -215,14 +210,13 @@ class _HomePageState extends State<HomePage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(title,
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                style: AppTextStyles.sectionTitle),
             const SizedBox(height: 8),
             FittedBox(
               fit: BoxFit.scaleDown,
               child: Text(
                 value,
-                style: TextStyle(
-                    fontSize: 20, fontWeight: FontWeight.w600, color: valueColor),
+                style: AppTextStyles.sectionValue.copyWith(color: valueColor),
               ),
             ),
             const Divider(height: 16),
@@ -233,7 +227,7 @@ class _HomePageState extends State<HomePage> {
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.centerLeft,
                   child: Text(line,
-                      style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                      style: AppTextStyles.hint),
                 ),
               ),
           ],

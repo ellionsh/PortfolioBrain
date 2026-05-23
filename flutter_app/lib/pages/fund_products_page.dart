@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../utils/error_format.dart';
 
 import '../api/api_client.dart';
+import '../theme/app_text_styles.dart';
 
 class FundProductsPage extends StatefulWidget {
   const FundProductsPage({super.key});
@@ -46,6 +47,17 @@ class _FundProductsPageState extends State<FundProductsPage> {
     );
   }
 
+  Future<Map<String, dynamic>?> _fetchFundById(int id) async {
+    final products = await ApiClient.getFundProducts();
+    for (final row in products) {
+      final m = row as Map<String, dynamic>;
+      if ((m['id'] as num?)?.toInt() == id) {
+        return m;
+      }
+    }
+    return null;
+  }
+
   double? _parseDouble(dynamic value) {
     if (value == null) return null;
     if (value is num) return value.toDouble();
@@ -75,21 +87,145 @@ class _FundProductsPageState extends State<FundProductsPage> {
     return '${(value * 100).toStringAsFixed(fraction)}%';
   }
 
-  String _formatDateRange(dynamic start, dynamic end) {
-    final startText = (start ?? '').toString().trim();
-    final endText = (end ?? '').toString().trim();
-    if (startText.isEmpty && endText.isEmpty) return '';
-    final displayStart = startText.isEmpty ? '至今' : startText;
-    final displayEnd = endText.isEmpty ? '至今' : endText;
-    if (displayStart == displayEnd) return displayStart;
-    return '$displayStart ~ $displayEnd';
-  }
-
   String _today() => DateTime.now().toIso8601String().substring(0, 10);
 
-  Future<void> _showFundDialog({Map<String, dynamic>? fund}) async {
+  Widget _buildInfoRow(String label, String value) {
+    if (value.trim().isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 84,
+            child: Text(label, style: AppTextStyles.hint),
+          ),
+          Expanded(child: Text(value)),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showFundDetail(Map<String, dynamic> fund) async {
+    Map<String, dynamic> current = Map<String, dynamic>.from(fund);
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            Future<void> refreshDetail() async {
+              final id = (current['id'] as num?)?.toInt();
+              if (id == null) return;
+              final latest = await _fetchFundById(id);
+              if (!mounted || latest == null) return;
+              setDialogState(() {
+                current = latest;
+              });
+            }
+
+            final shares = _parseDouble(current['shares']);
+            final nav = _parseDouble(current['nav']);
+            final principal = _parseDouble(current['principal']);
+            final principalCny = _parseDouble(current['principal_cny']);
+            final marketValueCny = _parseDouble(current['market_value_cny']);
+            final marketValue = (shares != null && nav != null) ? shares * nav : null;
+            final displayMarketValue = marketValueCny ?? marketValue;
+            final displayPrincipal = principalCny ?? principal;
+            final yieldRate =
+                (displayMarketValue != null &&
+                        displayPrincipal != null &&
+                        displayPrincipal > 0)
+                    ? (displayMarketValue - displayPrincipal) / displayPrincipal
+                    : null;
+            final startDate = _parseDate(current['start_date']);
+            double? annualizedYield;
+            if (yieldRate != null && startDate != null && yieldRate > -1) {
+              final days = DateTime.now().difference(startDate).inDays;
+              if (days > 0) {
+                annualizedYield = math.pow(1 + yieldRate, 365 / days) - 1;
+              }
+            }
+
+            return AlertDialog(
+              title: Text(current['fund_name'] ?? '基金详情'),
+              content: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildInfoRow('基金代码', (current['fund_code'] ?? '').toString()),
+                    _buildInfoRow('币种', (current['currency'] ?? '').toString()),
+                    _buildInfoRow('成本', _formatNumber(displayPrincipal)),
+                    _buildInfoRow('净值', _formatNav(nav)),
+                    _buildInfoRow('份额', _formatNumber(shares)),
+                    _buildInfoRow('市值', _formatNumber(displayMarketValue)),
+                    _buildInfoRow(
+                      '收益率',
+                      yieldRate == null ? '-' : _formatPercent(yieldRate),
+                    ),
+                    _buildInfoRow(
+                      '年化收益',
+                      annualizedYield == null
+                          ? '-'
+                          : _formatPercent(annualizedYield),
+                    ),
+                    _buildInfoRow(
+                        '开始日期', (current['start_date'] ?? '').toString()),
+                    _buildInfoRow('到期日', (current['end_date'] ?? '').toString()),
+                    _buildInfoRow('状态', (current['status'] ?? '').toString()),
+                    _buildInfoRow('备注', (current['remark'] ?? '').toString()),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('关闭'),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    final ok = await _buyFund(current);
+                    if (ok) {
+                      await refreshDetail();
+                    }
+                  },
+                  child: const Text('买入'),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    final ok = await _redeemFund(current);
+                    if (ok) {
+                      await refreshDetail();
+                    }
+                  },
+                  child: const Text('赎回'),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    final ok = await _showFundDialog(fund: current);
+                    if (ok) {
+                      await refreshDetail();
+                    }
+                  },
+                  child: const Text('编辑'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    _deleteFund(current);
+                  },
+                  child: const Text('删除'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<bool> _showFundDialog({Map<String, dynamic>? fund}) async {
     final accounts = await ApiClient.getAccounts();
-    if (!mounted) return;
+    if (!mounted) return false;
     final accountChoices = accounts
         .cast<Map<String, dynamic>>()
         .map(
@@ -196,11 +332,11 @@ class _FundProductsPageState extends State<FundProductsPage> {
                       onChanged: isNew ? fetchPreview : null,
                     ),
                     if (isNew)
-                      const Padding(
+                      Padding(
                         padding: EdgeInsets.only(top: 8),
                         child: Text(
                           '基金名称与净值将自动从 AkShare 获取',
-                          style: TextStyle(color: Colors.black54, fontSize: 12),
+                          style: AppTextStyles.hint.copyWith(color: Colors.black54),
                         ),
                       ),
                     if (isNew)
@@ -224,7 +360,7 @@ class _FundProductsPageState extends State<FundProductsPage> {
                             if (previewError != null) {
                               return Text(
                                 previewError!,
-                                style: const TextStyle(color: Colors.redAccent),
+                                style: AppTextStyles.hint.copyWith(color: Colors.redAccent),
                               );
                             }
                             if (previewName == null && previewNav == null) {
@@ -365,7 +501,9 @@ class _FundProductsPageState extends State<FundProductsPage> {
     debounceTimer?.cancel();
     if (result == true) {
       await _refresh();
+      return true;
     }
+    return false;
   }
 
   Future<void> _deleteFund(Map<String, dynamic> fund) async {
@@ -406,7 +544,7 @@ class _FundProductsPageState extends State<FundProductsPage> {
     await _refresh();
   }
 
-  Future<void> _buyFund(Map<String, dynamic> fund) async {
+  Future<bool> _buyFund(Map<String, dynamic> fund) async {
     final amountController = TextEditingController();
     final sharesController = TextEditingController();
     final navController =
@@ -503,16 +641,16 @@ class _FundProductsPageState extends State<FundProductsPage> {
     dateController.dispose();
 
     if (confirmed != true || amount == null || nav == null) {
-      return;
+      return false;
     }
 
     final accountId = fund['account_id'];
     if (accountId == null) {
-      if (!mounted) return;
+      if (!mounted) return false;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('该基金缺少所属账户')),
       );
-      return;
+      return false;
     }
 
     final request = <String, dynamic>{
@@ -526,18 +664,19 @@ class _FundProductsPageState extends State<FundProductsPage> {
       request['shares'] = shares;
     }
     final response = await ApiClient.operate('fund_buy', request);
-    if (!mounted) return;
+    if (!mounted) return false;
     final messenger = ScaffoldMessenger.of(context);
     if (response.containsKey('error')) {
       showErrorSnackBar(context, response['error']);
-      return;
+      return false;
     }
 
     messenger.showSnackBar(const SnackBar(content: Text('买入成功')));
     await _refresh();
+    return true;
   }
 
-  Future<void> _redeemFund(Map<String, dynamic> fund) async {
+  Future<bool> _redeemFund(Map<String, dynamic> fund) async {
     final sharesController =
         TextEditingController(text: fund['shares']?.toString() ?? '');
     final navController =
@@ -613,16 +752,16 @@ class _FundProductsPageState extends State<FundProductsPage> {
     dateController.dispose();
 
     if (confirmed != true || shares == null || nav == null) {
-      return;
+      return false;
     }
 
     final accountId = fund['account_id'];
     if (accountId == null) {
-      if (!mounted) return;
+      if (!mounted) return false;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('该基金缺少所属账户')),
       );
-      return;
+      return false;
     }
 
     final response = await ApiClient.operate('fund_sell', {
@@ -632,17 +771,18 @@ class _FundProductsPageState extends State<FundProductsPage> {
       'nav': nav,
       'date': date,
     });
-    if (!mounted) return;
+    if (!mounted) return false;
     final messenger = ScaffoldMessenger.of(context);
     if (response.containsKey('error')) {
       messenger.showSnackBar(
         SnackBar(content: Text(response['error'].toString())),
       );
-      return;
+      return false;
     }
 
     messenger.showSnackBar(const SnackBar(content: Text('赎回成功')));
     await _refresh();
+    return true;
   }
 
   @override
@@ -665,13 +805,12 @@ class _FundProductsPageState extends State<FundProductsPage> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
                 children: [
-                  const Expanded(
-                    child: Text(
-                      '基金产品',
-                      style:
-                          TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    const Expanded(
+                      child: Text(
+                        '基金产品',
+                        style: AppTextStyles.pageTitle,
+                      ),
                     ),
-                  ),
                   IconButton.filled(
                     onPressed: () => _showFundDialog(),
                     tooltip: '新增',
@@ -703,23 +842,49 @@ class _FundProductsPageState extends State<FundProductsPage> {
 
     final accountNames = grouped.keys.toList()..sort();
 
+    double? displayMarketValueFor(Map<String, dynamic> row) {
+      final shares = _parseDouble(row['shares']);
+      final nav = _parseDouble(row['nav']);
+      final marketValueCny = _parseDouble(row['market_value_cny']);
+      final marketValue = (shares != null && nav != null) ? shares * nav : null;
+      return marketValueCny ?? marketValue;
+    }
+
     return ListView(
       children: accountNames.map((name) {
         final items = grouped[name]!;
+        double totalMarketValue = 0;
+        bool hasTotal = false;
+        for (final item in items) {
+          final value = displayMarketValueFor(item);
+          if (value != null) {
+            totalMarketValue += value;
+            hasTotal = true;
+          }
+        }
         return ExpansionTile(
-          title: Text(
-            name,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          title: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  name,
+                  style: AppTextStyles.sectionTitle,
+                ),
+              ),
+              if (hasTotal)
+                Text(
+                  _formatNumber(totalMarketValue),
+                  style: AppTextStyles.sectionTitle.copyWith(
+                    color: Colors.black87,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+            ],
           ),
           children: items.map((row) {
-            final shares = _parseDouble(row['shares']);
-            final nav = _parseDouble(row['nav']);
             final principal = _parseDouble(row['principal']);
             final principalCny = _parseDouble(row['principal_cny']);
-            final marketValueCny = _parseDouble(row['market_value_cny']);
-            final marketValue =
-                (shares != null && nav != null) ? shares * nav : null;
-            final displayMarketValue = marketValueCny ?? marketValue;
+            final displayMarketValue = displayMarketValueFor(row);
             final displayPrincipal = principalCny ?? principal;
             final yieldRate =
                 (displayMarketValue != null &&
@@ -735,60 +900,21 @@ class _FundProductsPageState extends State<FundProductsPage> {
                 annualizedYield = math.pow(1 + yieldRate, 365 / days) - 1;
               }
             }
+            final endDate = (row['end_date'] ?? '').toString().trim();
+            final maturityText = '到期 ${endDate.isEmpty ? '-' : endDate}';
 
             return ListTile(
               title: Text(row['fund_name'] ?? '基金产品'),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    [
-                      row['fund_code'] ?? '',
-                      if (displayPrincipal != null)
-                        '成本 ${_formatNumber(displayPrincipal)}',
-                      if (nav != null) '净值 ${_formatNav(nav)}',
-                      if (shares != null) '份额 ${_formatNumber(shares)}',
-                      if (displayMarketValue != null)
-                        '市值 ${_formatNumber(displayMarketValue)}',
-                      if (yieldRate != null) '收益率 ${_formatPercent(yieldRate)}',
-                      if (annualizedYield != null)
-                        '年化 ${_formatPercent(annualizedYield)}',
-                      if (_formatDateRange(row['start_date'], row['end_date'])
-                          .isNotEmpty)
-                        _formatDateRange(row['start_date'], row['end_date']),
-                    ]
-                        .where((text) => text.toString().trim().isNotEmpty)
-                        .join(' · '),
-                  ),
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 6,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.add_shopping_cart, size: 20),
-                        onPressed: () => _buyFund(row),
-                        tooltip: '买入',
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.currency_exchange, size: 20),
-                        onPressed: () => _redeemFund(row),
-                        tooltip: '赎回',
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.edit, size: 20),
-                        onPressed: () => _showFundDialog(fund: row),
-                        tooltip: '编辑',
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.delete, size: 20),
-                        onPressed: () => _deleteFund(row),
-                        tooltip: '删除',
-                      ),
-                    ],
-                  ),
-                ],
+              subtitle: Text(
+                [
+                  if (displayMarketValue != null)
+                    '市值 ${_formatNumber(displayMarketValue)}',
+                  '收益率 ${yieldRate == null ? '-' : _formatPercent(yieldRate)}',
+                  '年化 ${annualizedYield == null ? '-' : _formatPercent(annualizedYield)}',
+                  maturityText,
+                ].join(' · '),
               ),
+              onTap: () => _showFundDetail(row),
             );
           }).toList(),
         );

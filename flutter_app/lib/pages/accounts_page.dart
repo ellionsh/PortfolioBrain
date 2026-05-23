@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../utils/error_format.dart';
 import '../api/api_client.dart';
+import '../theme/app_text_styles.dart';
 
 class AccountsPage extends StatefulWidget {
   const AccountsPage({super.key});
@@ -152,7 +153,7 @@ class _AccountsPageState extends State<AccountsPage> {
                 const Expanded(
                   child: Text(
                     '账户列表',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    style: AppTextStyles.pageTitle,
                   ),
                 ),
                 IconButton.filled(

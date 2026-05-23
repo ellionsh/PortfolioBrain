@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../api/api_client.dart';
+import '../theme/app_text_styles.dart';
 
 class LoginPage extends StatefulWidget {
   final VoidCallback onConfigRequested;
@@ -90,7 +91,7 @@ class _LoginPageState extends State<LoginPage> {
                 children: [
                   const Text(
                     '欢迎回来',
-                    style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
+                    style: AppTextStyles.pageTitle,
                   ),
                   const SizedBox(height: 8),
                   const Text('请输入登录信息以继续'),
@@ -117,7 +118,7 @@ class _LoginPageState extends State<LoginPage> {
                     const SizedBox(height: 12),
                     Text(
                       _error!,
-                      style: const TextStyle(color: Colors.red),
+                      style: AppTextStyles.hint.copyWith(color: Colors.red),
                     ),
                   ],
                   const SizedBox(height: 24),

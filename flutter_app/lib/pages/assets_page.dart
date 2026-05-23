@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../utils/error_format.dart';
 import '../api/api_client.dart';
+import '../theme/app_text_styles.dart';
 
 class AssetsPage extends StatefulWidget {
   const AssetsPage({super.key});
@@ -212,7 +213,7 @@ class _AssetsPageState extends State<AssetsPage> {
                     const Expanded(
                       child: Text(
                         '资产明细',
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                        style: AppTextStyles.pageTitle,
                       ),
                     ),
                     ElevatedButton.icon(
@@ -252,7 +253,7 @@ class _AssetsPageState extends State<AssetsPage> {
         return ExpansionTile(
           title: Text(
             name,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            style: AppTextStyles.sectionTitle,
           ),
           children: items.map((m) {
             final principal = (m['principal'] as num?)?.toDouble() ?? 0;

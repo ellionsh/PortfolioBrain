@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../api/api_client.dart';
 import '../utils/error_format.dart';
+import '../theme/app_text_styles.dart';
 
 class AgentChatPage extends StatefulWidget {
   const AgentChatPage({super.key});
@@ -189,7 +190,7 @@ class _AgentChatPageState extends State<AgentChatPage> {
                 const Expanded(
                   child: Text(
                     '智能资产助手',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    style: AppTextStyles.pageTitle,
                   ),
                 ),
                 IconButton(
@@ -275,9 +276,9 @@ class _AgentChatPageState extends State<AgentChatPage> {
                                 ),
                               ],
                             ),
-                            child: const Text(
+                            child: Text(
                               '有新消息',
-                              style: TextStyle(color: Colors.white, fontSize: 12),
+                              style: AppTextStyles.hint.copyWith(color: Colors.white),
                             ),
                           ),
                           if (_unreadCount > 0)
@@ -294,11 +295,7 @@ class _AgentChatPageState extends State<AgentChatPage> {
                                 child: Text(
                                   _unreadCount > 99 ? '99+' : '$_unreadCount',
                                   textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                                  style: AppTextStyles.badge.copyWith(fontWeight: FontWeight.w600),
                                 ),
                               ),
                             ),

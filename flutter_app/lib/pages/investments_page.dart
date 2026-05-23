@@ -4,6 +4,7 @@ import 'deposits_page.dart';
 import 'financial_products_page.dart';
 import 'fund_products_page.dart';
 import 'insurance_page.dart';
+import '../theme/app_text_styles.dart';
 
 class InvestmentsPage extends StatelessWidget {
   const InvestmentsPage({super.key});
@@ -21,7 +22,7 @@ class InvestmentsPage extends StatelessWidget {
                 alignment: Alignment.centerLeft,
                 child: Text(
                   '资产',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                  style: AppTextStyles.pageTitle,
                 ),
               ),
             ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../utils/error_format.dart';
 import '../api/api_client.dart';
+import '../theme/app_text_styles.dart';
 
 class FinancialProductsPage extends StatefulWidget {
   const FinancialProductsPage({super.key});
@@ -43,6 +44,17 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
     );
   }
 
+  Future<Map<String, dynamic>?> _fetchProductById(int id) async {
+    final products = await ApiClient.getFinancialProducts();
+    for (final row in products) {
+      final m = row as Map<String, dynamic>;
+      if ((m['id'] as num?)?.toInt() == id) {
+        return m;
+      }
+    }
+    return null;
+  }
+
   bool _isNavProduct(Map<String, dynamic> product) {
     return product['is_nav_based'] == 1 ||
         product['is_nav_based'] == true ||
@@ -67,21 +79,156 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
     return '${(value * 100).toStringAsFixed(fraction)}%';
   }
 
-  String _formatDateRange(dynamic start, dynamic end) {
-    final startText = (start ?? '').toString().trim();
-    final endText = (end ?? '').toString().trim();
-    if (startText.isEmpty && endText.isEmpty) return '';
-    final displayStart = startText.isEmpty ? '至今' : startText;
-    final displayEnd = endText.isEmpty ? '至今' : endText;
-    if (displayStart == displayEnd) return displayStart;
-    return '$displayStart ~ $displayEnd';
-  }
-
   String _today() => DateTime.now().toIso8601String().substring(0, 10);
 
-  Future<void> _showProductDialog({Map<String, dynamic>? product}) async {
+  Widget _buildInfoRow(String label, String value) {
+    if (value.trim().isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 84,
+            child: Text(label, style: AppTextStyles.hint),
+          ),
+          Expanded(child: Text(value)),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showProductDetail(Map<String, dynamic> product) async {
+    Map<String, dynamic> current = Map<String, dynamic>.from(product);
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            Future<void> refreshDetail() async {
+              final id = (current['id'] as num?)?.toInt();
+              if (id == null) return;
+              final latest = await _fetchProductById(id);
+              if (!mounted || latest == null) return;
+              setDialogState(() {
+                current = latest;
+              });
+            }
+
+            final isNavProduct = _isNavProduct(current);
+            final shares = _parseDouble(current['shares']);
+            final nav = _parseDouble(current['nav']);
+            final principal = _parseDouble(current['principal']);
+            final principalCny = _parseDouble(current['principal_cny']);
+            final marketValueCny = _parseDouble(current['market_value_cny']);
+            double? marketValue;
+            if (isNavProduct) {
+              if (shares != null && nav != null) {
+                marketValue = shares * nav;
+              }
+            } else {
+              if (shares != null) {
+                marketValue = shares;
+              }
+            }
+            final displayMarketValue = marketValueCny ?? marketValue;
+            final displayPrincipal = principalCny ?? principal;
+            final yieldRate =
+                (displayMarketValue != null &&
+                        displayPrincipal != null &&
+                        displayPrincipal > 0)
+                    ? (displayMarketValue - displayPrincipal) / displayPrincipal
+                    : null;
+            final annualizedYield = _parseDouble(current['annualized_yield']);
+
+            return AlertDialog(
+              title: Text(current['product_name'] ?? '理财产品详情'),
+              content: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildInfoRow(
+                        '产品代码', (current['product_code'] ?? '').toString()),
+                    _buildInfoRow('类型', (current['type'] ?? '').toString()),
+                    _buildInfoRow('币种', (current['currency'] ?? '').toString()),
+                    _buildInfoRow(
+                        '风险等级', (current['risk_level'] ?? '').toString()),
+                    _buildInfoRow(
+                      '最低赎回',
+                      _formatNumber(_parseDouble(current['min_redeem_unit'])),
+                    ),
+                    _buildInfoRow('本金', _formatNumber(displayPrincipal)),
+                    _buildInfoRow('净值', _formatNav(nav)),
+                    _buildInfoRow('份额', _formatNumber(shares)),
+                    _buildInfoRow('市值', _formatNumber(displayMarketValue)),
+                    _buildInfoRow(
+                      '收益率',
+                      yieldRate == null ? '-' : _formatPercent(yieldRate),
+                    ),
+                    _buildInfoRow(
+                      '年化收益',
+                      annualizedYield == null
+                          ? '-'
+                          : _formatPercent(annualizedYield),
+                    ),
+                    _buildInfoRow(
+                        '开始日期', (current['start_date'] ?? '').toString()),
+                    _buildInfoRow('到期日', (current['end_date'] ?? '').toString()),
+                    _buildInfoRow('状态', (current['status'] ?? '').toString()),
+                    _buildInfoRow('备注', (current['remark'] ?? '').toString()),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('关闭'),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    final ok = await _buyProduct(current);
+                    if (ok) {
+                      await refreshDetail();
+                    }
+                  },
+                  child: const Text('买入'),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    final ok = await _redeemProduct(current);
+                    if (ok) {
+                      await refreshDetail();
+                    }
+                  },
+                  child: const Text('赎回'),
+                ),
+                TextButton(
+                  onPressed: () async {
+                    final ok = await _showProductDialog(product: current);
+                    if (ok) {
+                      await refreshDetail();
+                    }
+                  },
+                  child: const Text('编辑'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    _deleteProduct(current);
+                  },
+                  child: const Text('删除'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<bool> _showProductDialog({Map<String, dynamic>? product}) async {
     final accounts = await ApiClient.getAccounts();
-    if (!mounted) return;
+    if (!mounted) return false;
     final accountChoices = accounts.cast<Map<String, dynamic>>().map((m) {
       return MapEntry((m['id'] as num).toInt(), m['name'] as String? ?? '');
     }).toList();
@@ -290,7 +437,9 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
 
     if (result == true) {
       await _refresh();
+      return true;
     }
+    return false;
   }
 
   Future<void> _deleteProduct(Map<String, dynamic> product) async {
@@ -333,7 +482,7 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
     await _refresh();
   }
 
-  Future<void> _buyProduct(Map<String, dynamic> product) async {
+  Future<bool> _buyProduct(Map<String, dynamic> product) async {
     final isNavProduct = _isNavProduct(product);
     final amountController = TextEditingController();
     final navController = TextEditingController(
@@ -418,16 +567,16 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
     dateController.dispose();
 
     if (confirmed != true || amount == null) {
-      return;
+      return false;
     }
 
     final accountId = product['account_id'];
     if (accountId == null) {
-      if (!mounted) return;
+      if (!mounted) return false;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('该产品缺少所属账户')),
       );
-      return;
+      return false;
     }
 
     final action = isNavProduct ? 'financial_buy_nav' : 'financial_buy_fixed';
@@ -447,18 +596,19 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
           };
 
     final response = await ApiClient.operate(action, params);
-    if (!mounted) return;
+    if (!mounted) return false;
     final messenger = ScaffoldMessenger.of(context);
     if (response.containsKey('error')) {
       showErrorSnackBar(context, response['error']);
-      return;
+      return false;
     }
 
     messenger.showSnackBar(const SnackBar(content: Text('买入成功')));
     await _refresh();
+    return true;
   }
 
-  Future<void> _redeemProduct(Map<String, dynamic> product) async {
+  Future<bool> _redeemProduct(Map<String, dynamic> product) async {
     final isNavProduct = _isNavProduct(product);
     final sharesController =
         TextEditingController(text: product['shares']?.toString() ?? '');
@@ -561,16 +711,16 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
     dateController.dispose();
 
     if (confirmed != true) {
-      return;
+      return false;
     }
 
     final accountId = product['account_id'];
     if (accountId == null) {
-      if (!mounted) return;
+      if (!mounted) return false;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('该产品缺少所属账户')),
       );
-      return;
+      return false;
     }
 
     final action = isNavProduct ? 'financial_sell_nav' : 'financial_sell_fixed';
@@ -590,15 +740,16 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
           };
 
     final response = await ApiClient.operate(action, params);
-    if (!mounted) return;
+    if (!mounted) return false;
     final messenger = ScaffoldMessenger.of(context);
     if (response.containsKey('error')) {
       showErrorSnackBar(context, response['error']);
-      return;
+      return false;
     }
 
     messenger.showSnackBar(const SnackBar(content: Text('赎回成功')));
     await _refresh();
+    return true;
   }
 
   @override
@@ -625,7 +776,7 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
                     const Expanded(
                       child: Text(
                         '理财产品',
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                        style: AppTextStyles.pageTitle,
                       ),
                     ),
                     IconButton.filled(
@@ -661,92 +812,80 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
 
     final accountNames = grouped.keys.toList()..sort();
 
+    double? displayMarketValueFor(Map<String, dynamic> m) {
+      final isNavProduct = _isNavProduct(m);
+      final shares = _parseDouble(m['shares']);
+      final nav = _parseDouble(m['nav']);
+      final marketValueCny = _parseDouble(m['market_value_cny']);
+      double? marketValue;
+      if (isNavProduct) {
+        if (shares != null && nav != null) {
+          marketValue = shares * nav;
+        }
+      } else {
+        if (shares != null) {
+          marketValue = shares;
+        }
+      }
+      return marketValueCny ?? marketValue;
+    }
+
     return ListView(
       children: accountNames.map((name) {
         final items = grouped[name]!;
+        double totalMarketValue = 0;
+        bool hasTotal = false;
+        for (final item in items) {
+          final value = displayMarketValueFor(item);
+          if (value != null) {
+            totalMarketValue += value;
+            hasTotal = true;
+          }
+        }
         return ExpansionTile(
-          title: Text(
-            name,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          title: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  name,
+                  style: AppTextStyles.sectionTitle,
+                ),
+              ),
+              if (hasTotal)
+                Text(
+                  _formatNumber(totalMarketValue),
+                  style: AppTextStyles.sectionTitle.copyWith(
+                    color: Colors.black87,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+            ],
           ),
           children: items.map((m) {
-            final isNavProduct = _isNavProduct(m);
-            final shares = _parseDouble(m['shares']);
-            final nav = _parseDouble(m['nav']);
             final principal = _parseDouble(m['principal']);
             final principalCny = _parseDouble(m['principal_cny']);
-            final marketValueCny = _parseDouble(m['market_value_cny']);
-            double? marketValue;
-            if (isNavProduct) {
-              if (shares != null && nav != null) {
-                marketValue = shares * nav;
-              }
-            } else {
-              if (shares != null) {
-                marketValue = shares;
-              }
-            }
-            final displayMarketValue = marketValueCny ?? marketValue;
+            final displayMarketValue = displayMarketValueFor(m);
             final displayPrincipal = principalCny ?? principal;
             final yieldRate =
                 (displayMarketValue != null && displayPrincipal != null && displayPrincipal > 0)
                     ? (displayMarketValue - displayPrincipal) / displayPrincipal
                 : null;
             final annualizedYield = _parseDouble(m['annualized_yield']);
+            final endDate = (m['end_date'] ?? '').toString().trim();
+            final maturityText = '到期 ${endDate.isEmpty ? '-' : endDate}';
 
             return ListTile(
               title: Text(m['product_name'] ?? '理财产品'),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    [
-                      m['type'] ?? '',
-                      m['product_code'] ?? '',
-                      if (displayPrincipal != null) '成本 ${_formatNumber(displayPrincipal)}',
-                      if (nav != null) '净值 ${_formatNav(nav)}',
-                      if (shares != null) '份额 ${_formatNumber(shares)}',
-                      if (displayMarketValue != null)
-                        '市值 ${_formatNumber(displayMarketValue)}',
-                      if (yieldRate != null) '收益率 ${_formatPercent(yieldRate)}',
-                      if (annualizedYield != null)
-                        '年化 ${_formatPercent(annualizedYield)}',
-                      if (_formatDateRange(m['start_date'], m['end_date'])
-                          .isNotEmpty)
-                        _formatDateRange(m['start_date'], m['end_date']),
-                    ]
-                        .where((text) => text.toString().trim().isNotEmpty)
-                        .join(' · '),
-                  ),
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 6,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.add_shopping_cart, size: 20),
-                        onPressed: () => _buyProduct(m),
-                        tooltip: '买入',
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.currency_exchange, size: 20),
-                        onPressed: () => _redeemProduct(m),
-                        tooltip: '赎回',
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.edit, size: 20),
-                        onPressed: () => _showProductDialog(product: m),
-                        tooltip: '编辑',
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.delete, size: 20),
-                        onPressed: () => _deleteProduct(m),
-                        tooltip: '删除',
-                      ),
-                    ],
-                  ),
-                ],
+              subtitle: Text(
+                [
+                  if (displayMarketValue != null)
+                    '市值 ${_formatNumber(displayMarketValue)}',
+                  '收益率 ${yieldRate == null ? '-' : _formatPercent(yieldRate)}',
+                  '年化 ${annualizedYield == null ? '-' : _formatPercent(annualizedYield)}',
+                  maturityText,
+                ].join(' · '),
               ),
+              onTap: () => _showProductDetail(m),
             );
           }).toList(),
         );

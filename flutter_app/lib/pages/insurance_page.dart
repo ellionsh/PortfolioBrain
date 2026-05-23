@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../utils/error_format.dart';
 import '../api/api_client.dart';
+import '../theme/app_text_styles.dart';
 
 class InsurancePage extends StatefulWidget {
   const InsurancePage({super.key});
@@ -242,7 +243,7 @@ class _InsurancePageState extends State<InsurancePage> {
                     const Expanded(
                       child: Text(
                         '保险产品',
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                        style: AppTextStyles.pageTitle,
                       ),
                     ),
                     IconButton.filled(

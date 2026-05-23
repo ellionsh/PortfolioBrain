@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../api/api_server_config.dart';
+import '../theme/app_text_styles.dart';
 
 class ServerConfigPage extends StatefulWidget {
   final ApiServerConfig initialConfig;
@@ -84,7 +85,7 @@ class _ServerConfigPageState extends State<ServerConfigPage> {
                 children: [
                   const Text(
                     '连接服务器',
-                    style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
+                    style: AppTextStyles.pageTitle,
                   ),
                   const SizedBox(height: 24),
                   SegmentedButton<String>(

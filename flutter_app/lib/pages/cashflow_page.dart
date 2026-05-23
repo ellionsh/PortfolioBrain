@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../utils/error_format.dart';
 import '../api/api_client.dart';
+import '../theme/app_text_styles.dart';
 
 class CashflowPage extends StatefulWidget {
   const CashflowPage({super.key});
@@ -78,6 +79,17 @@ class _CashflowPageState extends State<CashflowPage> {
       }
     }
     return null;
+  }
+
+  double? _annualizedYieldValue(Map<String, dynamic> m,
+      {bool isBank = false, bool isFund = false}) {
+    if (isBank) {
+      return _parseDouble(m['interest_rate']);
+    }
+    if (isFund) {
+      return _annualizedYieldForFund(m);
+    }
+    return _parseDouble(m['annualized_yield']);
   }
 
   String? _yieldStr(Map<String, dynamic> m, {bool isBank = false, bool isFund = false}) {
@@ -156,6 +168,7 @@ class _CashflowPageState extends State<CashflowPage> {
         value: val,
         endDate: endDate,
         yieldStr: _yieldStr(m, isBank: true),
+        yieldValue: _annualizedYieldValue(m, isBank: true),
         type: '存款',
       ));
     }
@@ -176,6 +189,7 @@ class _CashflowPageState extends State<CashflowPage> {
         value: val,
         endDate: endDate,
         yieldStr: _yieldStr(m),
+        yieldValue: _annualizedYieldValue(m),
         type: '理财',
       ));
     }
@@ -196,10 +210,12 @@ class _CashflowPageState extends State<CashflowPage> {
         value: val,
         endDate: endDate,
         yieldStr: _yieldStr(m, isFund: true),
+        yieldValue: _annualizedYieldValue(m, isFund: true),
         type: '基金',
       ));
     }
 
+    _sortBucketItems(buckets);
     return _MaturityData(buckets: buckets);
   }
 
@@ -226,8 +242,7 @@ class _CashflowPageState extends State<CashflowPage> {
             padding: const EdgeInsets.all(16),
             child: ListView(
               children: [
-                const Text('资产到期分布',
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                const Text('资产到期分布', style: AppTextStyles.pageTitle),
                 const SizedBox(height: 16),
                 ...List.generate(_bucketLabels.length, (i) {
                   final b = data.buckets[i];
@@ -259,8 +274,7 @@ class _CashflowPageState extends State<CashflowPage> {
                                   children: [
                                     Expanded(
                                       child: Text(_bucketLabels[i],
-                                          style: const TextStyle(
-                                              fontSize: 16, fontWeight: FontWeight.bold)),
+                                          style: AppTextStyles.sectionTitle),
                                     ),
                                     if (b.items.isNotEmpty)
                                       Icon(expanded ? Icons.expand_less : Icons.expand_more,
@@ -268,8 +282,7 @@ class _CashflowPageState extends State<CashflowPage> {
                                     const SizedBox(width: 4),
                                     Text(
                                       b.total.toStringAsFixed(2),
-                                      style: const TextStyle(
-                                          fontSize: 16, fontWeight: FontWeight.w600),
+                                      style: AppTextStyles.sectionValue,
                                     ),
                                   ],
                                 ),
@@ -289,7 +302,7 @@ class _CashflowPageState extends State<CashflowPage> {
                                     if (b.financial != 0) '理财 ${b.financial.toStringAsFixed(2)}',
                                     if (b.fund != 0) '基金 ${b.fund.toStringAsFixed(2)}',
                                   ].join('  ·  '),
-                                  style: const TextStyle(fontSize: 13, color: Colors.grey),
+                                  style: AppTextStyles.caption,
                                 ),
                               ],
                             ),
@@ -313,7 +326,7 @@ class _CashflowPageState extends State<CashflowPage> {
                                         borderRadius: BorderRadius.circular(3),
                                       ),
                                       child: Text(item.type,
-                                          style: const TextStyle(fontSize: 10, color: Colors.white)),
+                                          style: AppTextStyles.badge),
                                     ),
                                     const SizedBox(width: 8),
                                     Expanded(
@@ -321,7 +334,7 @@ class _CashflowPageState extends State<CashflowPage> {
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
                                           Text(item.name,
-                                              style: const TextStyle(fontSize: 14),
+                                              style: AppTextStyles.body,
                                               overflow: TextOverflow.ellipsis),
                                           Text(
                                             [
@@ -329,14 +342,14 @@ class _CashflowPageState extends State<CashflowPage> {
                                               if (item.endDate != null) '到期 ${item.endDate}',
                                               if (item.yieldStr != null) item.yieldStr!,
                                             ].join(' · '),
-                                            style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                            style: AppTextStyles.label,
                                           ),
                                         ],
                                       ),
                                     ),
                                     Text(
                                       item.value.toStringAsFixed(2),
-                                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                                      style: AppTextStyles.bodyStrong,
                                     ),
                                   ],
                                 ),
@@ -368,6 +381,25 @@ class _CashflowPageState extends State<CashflowPage> {
         return Colors.grey;
     }
   }
+
+  void _sortBucketItems(List<_MaturityBucket> buckets) {
+    const typeOrder = {'存款': 0, '理财': 1, '基金': 2};
+    for (final bucket in buckets) {
+      bucket.items.sort((a, b) {
+        final orderA = typeOrder[a.type] ?? 99;
+        final orderB = typeOrder[b.type] ?? 99;
+        if (orderA != orderB) return orderA.compareTo(orderB);
+        final yieldA = a.yieldValue;
+        final yieldB = b.yieldValue;
+        if (yieldA == null && yieldB == null) return 0;
+        if (yieldA == null) return 1;
+        if (yieldB == null) return -1;
+        final yieldCompare = yieldA.compareTo(yieldB);
+        if (yieldCompare != 0) return yieldCompare;
+        return a.name.compareTo(b.name);
+      });
+    }
+  }
 }
 
 const _bucketLabels = [
@@ -386,6 +418,7 @@ class _AssetItem {
   final double value;
   final String? endDate;
   final String? yieldStr;
+  final double? yieldValue;
   final String type;
 
   const _AssetItem({
@@ -394,6 +427,7 @@ class _AssetItem {
     required this.value,
     this.endDate,
     this.yieldStr,
+    this.yieldValue,
     required this.type,
   });
 }

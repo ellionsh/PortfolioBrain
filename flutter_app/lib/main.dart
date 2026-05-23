@@ -55,7 +55,6 @@ class _PortfolioBrainAppState extends State<PortfolioBrainApp> {
 
   late ApiServerConfig _config;
   String? _token;
-  String? _refreshToken;
   int _configVersion = 0;
   int _homeReloadVersion = 0;
 
@@ -65,7 +64,6 @@ class _PortfolioBrainAppState extends State<PortfolioBrainApp> {
 
     _config = widget.initialConfig;
     _token = widget.initialToken;
-    _refreshToken = widget.initialRefreshToken;
   }
 
   void _applyConfig(ApiServerConfig config) {
@@ -92,7 +90,6 @@ class _PortfolioBrainAppState extends State<PortfolioBrainApp> {
     if (!mounted) return;
     setState(() {
       _token = accessToken;
-      _refreshToken = refreshToken;
       _index = 0;
     });
   }
@@ -161,6 +158,17 @@ class _PortfolioBrainAppState extends State<PortfolioBrainApp> {
           seedColor: Colors.indigo,
         ),
         useMaterial3: true,
+        textTheme: const TextTheme(
+          titleLarge: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          titleMedium: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          titleSmall: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          bodyLarge: TextStyle(fontSize: 14),
+          bodyMedium: TextStyle(fontSize: 14),
+          bodySmall: TextStyle(fontSize: 11),
+          labelLarge: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+          labelMedium: TextStyle(fontSize: 13),
+          labelSmall: TextStyle(fontSize: 12),
+        ),
       ),
 
       home: _config.isConfigured
