@@ -45,6 +45,17 @@ class _DepositsPageState extends State<DepositsPage> {
     );
   }
 
+  DateTime? _parseDate(dynamic value) {
+    if (value == null) return null;
+    final text = value.toString().trim();
+    if (text.isEmpty) return null;
+    try {
+      return DateTime.parse(text);
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> _showDepositDialog({Map<String, dynamic>? deposit, required Map<int, String> accountNames}) async {
     final accountChoices = accountNames.entries.toList();
 
@@ -322,6 +333,22 @@ class _DepositsPageState extends State<DepositsPage> {
     return ListView(
       children: accountNames.map((name) {
         final items = grouped[name]!;
+        items.sort((a, b) {
+          final aDate = _parseDate(a['end_date']);
+          final bDate = _parseDate(b['end_date']);
+          final aHasDate = aDate != null;
+          final bHasDate = bDate != null;
+          if (aHasDate != bHasDate) {
+            return aHasDate ? 1 : -1;
+          }
+          if (aHasDate && bHasDate) {
+            final dateCompare = aDate.compareTo(bDate);
+            if (dateCompare != 0) return dateCompare;
+          }
+          final aYield = (a['interest_rate'] as num?)?.toDouble() ?? double.negativeInfinity;
+          final bYield = (b['interest_rate'] as num?)?.toDouble() ?? double.negativeInfinity;
+          return aYield.compareTo(bYield);
+        });
         return ExpansionTile(
           title: Text(
             name,

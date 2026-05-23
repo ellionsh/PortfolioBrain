@@ -67,6 +67,17 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
     return double.tryParse(value.toString());
   }
 
+  DateTime? _parseDate(dynamic value) {
+    if (value == null) return null;
+    final text = value.toString().trim();
+    if (text.isEmpty) return null;
+    try {
+      return DateTime.parse(text);
+    } catch (_) {
+      return null;
+    }
+  }
+
   String _formatNumber(double? value, {int fraction = 2}) {
     if (value == null) return '';
     return value.toStringAsFixed(fraction);
@@ -830,9 +841,27 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
       return marketValueCny ?? marketValue;
     }
 
+    int compareItems(Map<String, dynamic> a, Map<String, dynamic> b) {
+      final aDate = _parseDate(a['end_date']);
+      final bDate = _parseDate(b['end_date']);
+      final aHasDate = aDate != null;
+      final bHasDate = bDate != null;
+      if (aHasDate != bHasDate) {
+        return aHasDate ? 1 : -1;
+      }
+      if (aHasDate && bHasDate) {
+        final dateCompare = aDate.compareTo(bDate);
+        if (dateCompare != 0) return dateCompare;
+      }
+      final aYield = _parseDouble(a['annualized_yield']) ?? double.negativeInfinity;
+      final bYield = _parseDouble(b['annualized_yield']) ?? double.negativeInfinity;
+      return aYield.compareTo(bYield);
+    }
+
     return ListView(
       children: accountNames.map((name) {
         final items = grouped[name]!;
+        items.sort(compareItems);
         double totalMarketValue = 0;
         bool hasTotal = false;
         for (final item in items) {

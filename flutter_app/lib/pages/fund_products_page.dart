@@ -850,9 +850,48 @@ class _FundProductsPageState extends State<FundProductsPage> {
       return marketValueCny ?? marketValue;
     }
 
+    double? annualizedYieldFor(Map<String, dynamic> row) {
+      final principal = _parseDouble(row['principal']);
+      final principalCny = _parseDouble(row['principal_cny']);
+      final displayMarketValue = displayMarketValueFor(row);
+      final displayPrincipal = principalCny ?? principal;
+      final yieldRate =
+          (displayMarketValue != null &&
+                  displayPrincipal != null &&
+                  displayPrincipal > 0)
+              ? (displayMarketValue - displayPrincipal) / displayPrincipal
+              : null;
+      final startDate = _parseDate(row['start_date']);
+      if (yieldRate != null && startDate != null && yieldRate > -1) {
+        final days = DateTime.now().difference(startDate).inDays;
+        if (days > 0) {
+          return math.pow(1 + yieldRate, 365 / days) - 1;
+        }
+      }
+      return null;
+    }
+
+    int compareItems(Map<String, dynamic> a, Map<String, dynamic> b) {
+      final aDate = _parseDate(a['end_date']);
+      final bDate = _parseDate(b['end_date']);
+      final aHasDate = aDate != null;
+      final bHasDate = bDate != null;
+      if (aHasDate != bHasDate) {
+        return aHasDate ? 1 : -1;
+      }
+      if (aHasDate && bHasDate) {
+        final dateCompare = aDate.compareTo(bDate);
+        if (dateCompare != 0) return dateCompare;
+      }
+      final aYield = annualizedYieldFor(a) ?? double.negativeInfinity;
+      final bYield = annualizedYieldFor(b) ?? double.negativeInfinity;
+      return aYield.compareTo(bYield);
+    }
+
     return ListView(
       children: accountNames.map((name) {
         final items = grouped[name]!;
+        items.sort(compareItems);
         double totalMarketValue = 0;
         bool hasTotal = false;
         for (final item in items) {
