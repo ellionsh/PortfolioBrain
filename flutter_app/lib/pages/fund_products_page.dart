@@ -147,11 +147,17 @@ class _FundProductsPageState extends State<FundProductsPage> {
             }
 
             return AlertDialog(
+              insetPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
               title: Text(current['fund_name'] ?? '基金详情'),
-              content: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+              content: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 520),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                     _buildInfoRow('基金代码', (current['fund_code'] ?? '').toString()),
                     _buildInfoRow('币种', (current['currency'] ?? '').toString()),
                     _buildInfoRow('成本', _formatNumber(displayPrincipal)),
@@ -173,47 +179,60 @@ class _FundProductsPageState extends State<FundProductsPage> {
                     _buildInfoRow('到期日', (current['end_date'] ?? '').toString()),
                     _buildInfoRow('状态', (current['status'] ?? '').toString()),
                     _buildInfoRow('备注', (current['remark'] ?? '').toString()),
-                  ],
+                      ],
+                    ),
+                  ),
                 ),
               ),
               actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('关闭'),
-                ),
-                TextButton(
-                  onPressed: () async {
-                    final ok = await _buyFund(current);
-                    if (ok) {
-                      await refreshDetail();
-                    }
-                  },
-                  child: const Text('买入'),
-                ),
-                TextButton(
-                  onPressed: () async {
-                    final ok = await _redeemFund(current);
-                    if (ok) {
-                      await refreshDetail();
-                    }
-                  },
-                  child: const Text('赎回'),
-                ),
-                TextButton(
-                  onPressed: () async {
-                    final ok = await _showFundDialog(fund: current);
-                    if (ok) {
-                      await refreshDetail();
-                    }
-                  },
-                  child: const Text('编辑'),
-                ),
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    _deleteFund(current);
-                  },
-                  child: const Text('删除'),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('关闭'),
+                      ),
+                      const SizedBox(width: 8),
+                      TextButton(
+                        onPressed: () async {
+                          final ok = await _buyFund(current);
+                          if (ok) {
+                            await refreshDetail();
+                          }
+                        },
+                        child: const Text('买入'),
+                      ),
+                      const SizedBox(width: 8),
+                      TextButton(
+                        onPressed: () async {
+                          final ok = await _redeemFund(current);
+                          if (ok) {
+                            await refreshDetail();
+                          }
+                        },
+                        child: const Text('赎回'),
+                      ),
+                      const SizedBox(width: 8),
+                      TextButton(
+                        onPressed: () async {
+                          final ok = await _showFundDialog(fund: current);
+                          if (ok) {
+                            await refreshDetail();
+                          }
+                        },
+                        child: const Text('编辑'),
+                      ),
+                      const SizedBox(width: 8),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          _deleteFund(current);
+                        },
+                        child: const Text('删除'),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             );

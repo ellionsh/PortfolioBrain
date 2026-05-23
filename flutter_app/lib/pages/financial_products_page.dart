@@ -153,11 +153,17 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
             final annualizedYield = _parseDouble(current['annualized_yield']);
 
             return AlertDialog(
+              insetPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
               title: Text(current['product_name'] ?? '理财产品详情'),
-              content: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+              content: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 520),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                     _buildInfoRow(
                         '产品代码', (current['product_code'] ?? '').toString()),
                     _buildInfoRow('类型', (current['type'] ?? '').toString()),
@@ -187,47 +193,60 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
                     _buildInfoRow('到期日', (current['end_date'] ?? '').toString()),
                     _buildInfoRow('状态', (current['status'] ?? '').toString()),
                     _buildInfoRow('备注', (current['remark'] ?? '').toString()),
-                  ],
+                      ],
+                    ),
+                  ),
                 ),
               ),
               actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('关闭'),
-                ),
-                TextButton(
-                  onPressed: () async {
-                    final ok = await _buyProduct(current);
-                    if (ok) {
-                      await refreshDetail();
-                    }
-                  },
-                  child: const Text('买入'),
-                ),
-                TextButton(
-                  onPressed: () async {
-                    final ok = await _redeemProduct(current);
-                    if (ok) {
-                      await refreshDetail();
-                    }
-                  },
-                  child: const Text('赎回'),
-                ),
-                TextButton(
-                  onPressed: () async {
-                    final ok = await _showProductDialog(product: current);
-                    if (ok) {
-                      await refreshDetail();
-                    }
-                  },
-                  child: const Text('编辑'),
-                ),
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    _deleteProduct(current);
-                  },
-                  child: const Text('删除'),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('关闭'),
+                      ),
+                      const SizedBox(width: 8),
+                      TextButton(
+                        onPressed: () async {
+                          final ok = await _buyProduct(current);
+                          if (ok) {
+                            await refreshDetail();
+                          }
+                        },
+                        child: const Text('买入'),
+                      ),
+                      const SizedBox(width: 8),
+                      TextButton(
+                        onPressed: () async {
+                          final ok = await _redeemProduct(current);
+                          if (ok) {
+                            await refreshDetail();
+                          }
+                        },
+                        child: const Text('赎回'),
+                      ),
+                      const SizedBox(width: 8),
+                      TextButton(
+                        onPressed: () async {
+                          final ok = await _showProductDialog(product: current);
+                          if (ok) {
+                            await refreshDetail();
+                          }
+                        },
+                        child: const Text('编辑'),
+                      ),
+                      const SizedBox(width: 8),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          _deleteProduct(current);
+                        },
+                        child: const Text('删除'),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             );
