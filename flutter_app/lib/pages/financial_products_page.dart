@@ -207,7 +207,7 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
                         onPressed: () => Navigator.of(context).pop(),
                         child: const Text('关闭'),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 4),
                       TextButton(
                         onPressed: () async {
                           final ok = await _buyProduct(current);
@@ -217,7 +217,7 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
                         },
                         child: const Text('买入'),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 4),
                       TextButton(
                         onPressed: () async {
                           final ok = await _redeemProduct(current);
@@ -227,7 +227,7 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
                         },
                         child: const Text('赎回'),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 4),
                       TextButton(
                         onPressed: () async {
                           final ok = await _showProductDialog(product: current);
@@ -237,7 +237,7 @@ class _FinancialProductsPageState extends State<FinancialProductsPage> {
                         },
                         child: const Text('编辑'),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 4),
                       TextButton(
                         onPressed: () {
                           Navigator.of(context).pop();
