@@ -20,6 +20,8 @@ DB_NAME = os.getenv("PB_DB_NAME", "portfolio")
 DEEPSEEK_API_KEY = os.getenv("PB_DEEPSEEK_API_KEY", "")
 DEEPSEEK_BASE_URL = os.getenv("PB_DEEPSEEK_BASE_URL", "https://api.deepseek.com")
 DEEPSEEK_MODEL = os.getenv("PB_DEEPSEEK_MODEL", "deepseek-v4-flash")
+LLM_TIMEOUT_SECONDS = float(os.getenv("PB_LLM_TIMEOUT_SECONDS", "20"))
+LLM_MAX_RETRIES = int(os.getenv("PB_LLM_MAX_RETRIES", "1"))
 
 # ============================
 # Web Server Configuration

@@ -144,7 +144,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import config
 
-from agent.agent import agent_chat
+from agent.agent import agent_chat, LLMRequestError, LLMTimeoutError
 from core.cashflow_engine import CashflowEngine
 from db.db import session_scope
 from web.auth import auth_required, authenticate_user, create_user, issue_token, issue_refresh_token, get_user_by_id, ensure_auth_ready
@@ -538,6 +538,10 @@ def chat():
     q = request.json.get("query", "")
     try:
         return jsonify({"response": agent_chat(q)})
+    except LLMTimeoutError as exc:
+        return jsonify({"error": str(exc)}), 504
+    except LLMRequestError as exc:
+        return jsonify({"error": str(exc)}), 502
     except Exception as exc:
         if _is_db_connection_error(exc):
             return jsonify({"error": _db_connection_tip()}), 500

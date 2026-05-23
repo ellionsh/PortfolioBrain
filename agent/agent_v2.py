@@ -3,7 +3,8 @@
 import json
 import asyncio
 import time
-from openai import OpenAI
+import httpx
+from openai import OpenAI, APITimeoutError, APIConnectionError, RateLimitError, APIStatusError
 
 from db.db import session_scope
 from skills.sql_skill import SQLSkill
@@ -36,7 +37,9 @@ def compress_result(result, max_items=5):
 
 client = OpenAI(
     api_key=config.DEEPSEEK_API_KEY,
-    base_url=config.DEEPSEEK_BASE_URL
+    base_url=config.DEEPSEEK_BASE_URL,
+    timeout=httpx.Timeout(config.LLM_TIMEOUT_SECONDS),
+    max_retries=config.LLM_MAX_RETRIES,
 )
 
 sql_skill = SQLSkill()
@@ -102,13 +105,20 @@ def agent_chat(user_query: str) -> str:
 
     # ========= STEP 1: 让模型决定是否调用工具 =========
     t0 = time.time()
-    resp = client.chat.completions.create(
-        model=config.DEEPSEEK_MODEL,
-        messages=messages,
-        tools=tools,
-        tool_choice="auto",
-        extra_body={"thinking": {"type": "disabled"}}
-    )
+    try:
+        resp = client.chat.completions.create(
+            model=config.DEEPSEEK_MODEL,
+            messages=messages,
+            tools=tools,
+            tool_choice="auto",
+            extra_body={"thinking": {"type": "disabled"}}
+        )
+    except APITimeoutError as exc:
+        raise RuntimeError("LLM 请求超时，请稍后重试。") from exc
+    except (APIConnectionError, RateLimitError) as exc:
+        raise RuntimeError("LLM 连接失败，请稍后重试。") from exc
+    except APIStatusError as exc:
+        raise RuntimeError(f"LLM 接口错误: {exc.status_code}") from exc
     print("LLM Step1耗时:", time.time() - t0)
 
     msg = resp.choices[0].message

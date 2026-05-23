@@ -1,6 +1,7 @@
 # agent/agent.py
 import json
-from openai import OpenAI
+import httpx
+from openai import OpenAI, APITimeoutError, APIConnectionError, RateLimitError, APIStatusError
 
 from db.db import session_scope
 from skills.sql_skill import SQLSkill
@@ -12,6 +13,12 @@ import time
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError, InterfaceError, DBAPIError
 from decimal import Decimal
+
+class LLMRequestError(Exception):
+    pass
+
+class LLMTimeoutError(LLMRequestError):
+    pass
 
 def serialize(obj):
     if isinstance(obj, (datetime.date, datetime.datetime)):
@@ -269,7 +276,9 @@ def _fund_annualized_yield(session, fund_id=None, fund_code=None, fund_name=None
 # 使用 OpenAI SDK 调用 DeepSeek API（官方推荐方式）
 client = OpenAI(
     api_key=config.DEEPSEEK_API_KEY,
-    base_url=config.DEEPSEEK_BASE_URL
+    base_url=config.DEEPSEEK_BASE_URL,
+    timeout=httpx.Timeout(config.LLM_TIMEOUT_SECONDS),
+    max_retries=config.LLM_MAX_RETRIES,
 )
 
 # 初始化技能
@@ -414,12 +423,19 @@ def agent_chat(user_query: str) -> str:
     start_total = time.time()
     while True:
         t0 = time.time()
-        resp = client.chat.completions.create(
-            model=config.DEEPSEEK_MODEL,
-            messages=messages,
-            tools=tools,
-            # extra_body={"thinking": {"type": "disabled"}}
-        )
+        try:
+            resp = client.chat.completions.create(
+                model=config.DEEPSEEK_MODEL,
+                messages=messages,
+                tools=tools,
+                # extra_body={"thinking": {"type": "disabled"}}
+            )
+        except APITimeoutError as exc:
+            raise LLMTimeoutError("LLM 请求超时，请稍后重试。") from exc
+        except (APIConnectionError, RateLimitError) as exc:
+            raise LLMRequestError("LLM 连接失败，请稍后重试。") from exc
+        except APIStatusError as exc:
+            raise LLMRequestError(f"LLM 接口错误: {exc.status_code}") from exc
         print("LLM 耗时:", time.time() - t0)
 
         msg = resp.choices[0].message

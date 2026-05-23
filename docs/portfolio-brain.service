@@ -1,0 +1,22 @@
+[Unit]
+Description=PortfolioBrain API (Gunicorn)
+After=network.target
+
+[Service]
+Type=simple
+User=sch
+Group=sch
+WorkingDirectory=/home/sch/PortfolioBrain
+EnvironmentFile=/home/sch/PortfolioBrain/.env
+ExecStart=/home/sch/PortfolioBrain/venv/bin/gunicorn \
+  --workers 2 \
+  --threads 2 \
+  --timeout 45 \
+  --bind 0.0.0.0:5000 \
+  web.app:app
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target
