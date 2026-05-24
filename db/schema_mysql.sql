@@ -191,14 +191,19 @@ CREATE TABLE positions (
     id INT AUTO_INCREMENT PRIMARY KEY,
     date DATE,
     account_id INT,
+    source_type VARCHAR(50) NOT NULL DEFAULT 'asset',   -- asset/bank/financial/insurance/fund
+    source_id INT,
     asset_code VARCHAR(100),
+    asset_name VARCHAR(255),
     shares DECIMAL(18,4),
     cost DECIMAL(18,2),
     market_value DECIMAL(18,2),
+    annual_yield_rate DECIMAL(10,4),
     currency VARCHAR(10),
     update_time DATETIME,
     INDEX idx_positions_date (date),
     INDEX idx_positions_account (account_id),
+    INDEX idx_positions_source (source_type, source_id),
     INDEX idx_positions_asset (asset_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
