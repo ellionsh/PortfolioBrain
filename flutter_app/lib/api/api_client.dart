@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'auth_storage.dart';
@@ -7,6 +8,8 @@ class ApiClient {
   static String? _token;
   static String? _refreshToken;
   static Future<bool>? _refreshFuture;
+  static const Duration _defaultTimeout = Duration(seconds: 30);
+  static const Duration _chatTimeout = Duration(minutes: 3);
 
   static String get baseUrl => _baseUrl;
 
@@ -101,8 +104,19 @@ class ApiClient {
   }
 
   static Future<http.Response> _requestWithRetry(
-      Future<http.Response> Function() send) async {
-    final resp = await send();
+    Future<http.Response> Function() send, {
+    Duration? timeout,
+    String? timeoutLabel,
+  }) async {
+    http.Response resp;
+    try {
+      resp = await send().timeout(timeout ?? _defaultTimeout);
+    } on TimeoutException {
+      final label = (timeoutLabel == null || timeoutLabel.isEmpty)
+          ? 'Request'
+          : timeoutLabel;
+      throw Exception('$label超时，请稍后再试');
+    }
     if (resp.statusCode != 401) {
       return resp;
     }
@@ -145,7 +159,7 @@ class ApiClient {
         headers: _headers(json: true),
         body: jsonEncode({'query': query}),
       );
-    });
+    }, timeout: _chatTimeout, timeoutLabel: '对话请求');
     if (resp.statusCode == 200) {
       final data = jsonDecode(_readBody(resp));
       return data['response'] as String;
