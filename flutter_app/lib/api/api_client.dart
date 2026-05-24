@@ -9,7 +9,7 @@ class ApiClient {
   static String? _refreshToken;
   static Future<bool>? _refreshFuture;
   static const Duration _defaultTimeout = Duration(seconds: 30);
-  static const Duration _chatTimeout = Duration(minutes: 3);
+  static const Duration _chatTimeout = Duration(minutes: 5);
 
   static String get baseUrl => _baseUrl;
 

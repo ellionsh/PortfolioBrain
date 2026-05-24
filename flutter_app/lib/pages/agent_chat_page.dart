@@ -248,8 +248,11 @@ class _AgentChatPageState extends State<AgentChatPage> {
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: m.role == 'assistant'
-                            ? MarkdownBody(data: m.content)
-                            : Text(m.content),
+                            ? MarkdownBody(
+                                data: m.content,
+                                selectable: true,
+                              )
+                            : SelectableText(m.content),
                       ),
                     );
                   },
