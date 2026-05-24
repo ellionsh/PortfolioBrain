@@ -311,9 +311,12 @@ class AssetOperator:
     def _sell_fixed_financial(self, product_id, account_id, amount, date):
         self.session.execute(text("""
             UPDATE financial_products
-            SET status='redeemed',
-                principal = COALESCE(principal,0) - :amount,
-                shares = COALESCE(shares,0) - :amount
+            SET principal = COALESCE(principal,0) - :amount,
+                shares = COALESCE(shares,0) - :amount,
+                status = CASE
+                    WHEN COALESCE(shares,0) - :amount <= 0 THEN 'redeemed'
+                    ELSE status
+                END
             WHERE id=:pid
         """), {"pid": product_id, "amount": amount})
 
