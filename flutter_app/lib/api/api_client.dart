@@ -48,6 +48,10 @@ class ApiClient {
 
   static String _prettyErrorBody(String body) {
     if (body.isEmpty) return body;
+    if (body.trimLeft().toLowerCase().startsWith('<!doctype html') ||
+        body.trimLeft().toLowerCase().startsWith('<html')) {
+      return '服务器响应异常';
+    }
     try {
       final decoded = jsonDecode(body);
       if (decoded is Map && decoded['error'] is String) {
@@ -63,7 +67,9 @@ class ApiClient {
   static Never _throwApiError(String label, http.Response resp) {
     final body = _prettyErrorBody(_readBody(resp));
     final suffix = body.isNotEmpty ? ' $body' : '';
-    throw Exception('$label API error: ${resp.statusCode}$suffix');
+    final friendly = resp.statusCode >= 500 && body.isEmpty ? '服务器繁忙，请稍后再试' : '';
+    final finalSuffix = friendly.isNotEmpty ? ' $friendly' : suffix;
+    throw Exception('$label API error: ${resp.statusCode}$finalSuffix');
   }
 
   static Future<bool> _refreshAccessToken() {
