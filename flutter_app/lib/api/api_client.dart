@@ -258,6 +258,34 @@ class ApiClient {
     }
   }
 
+  static Future<List<dynamic>> getPositions() async {
+    final resp = await _requestWithRetry(() {
+      return http.get(
+        Uri.parse('$baseUrl/positions'),
+        headers: _headers(),
+      );
+    });
+    if (resp.statusCode == 200) {
+      return jsonDecode(_readBody(resp)) as List<dynamic>;
+    } else {
+      _throwApiError('Positions', resp);
+    }
+  }
+
+  static Future<List<dynamic>> getPositionsSummary() async {
+    final resp = await _requestWithRetry(() {
+      return http.get(
+        Uri.parse('$baseUrl/positions_summary'),
+        headers: _headers(),
+      );
+    });
+    if (resp.statusCode == 200) {
+      return jsonDecode(_readBody(resp)) as List<dynamic>;
+    } else {
+      _throwApiError('Positions summary', resp);
+    }
+  }
+
   static Future<Map<String, dynamic>> getFundMeta(String fundCode) async {
     final uri = Uri.parse('$baseUrl/fund_meta')
         .replace(queryParameters: {'fund_code': fundCode});

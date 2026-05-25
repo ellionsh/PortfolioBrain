@@ -666,6 +666,65 @@ def positions():
 
 
 # ============================
+# 3.1 持仓汇总（按日）
+# ============================
+@app.route("/positions_summary", methods=["GET"])
+@auth_required
+def positions_summary():
+    with session_scope() as session:
+        df = pd.read_sql(text("""
+            SELECT date, source_type, market_value, cost, currency, annual_yield_rate
+            FROM positions
+            WHERE date IS NOT NULL
+            ORDER BY date ASC
+        """), session.bind)
+
+        if df is None or df.empty:
+            return jsonify([])
+
+        rate_map = _get_fx_rate_map(session)
+
+        def to_cny(row):
+            currency = str(row.get("currency") or "CNY").upper()
+            rate = rate_map.get(currency, 1.0)
+            mv = row.get("market_value")
+            cost = row.get("cost")
+            value = mv if mv is not None else cost
+            try:
+                return float(value) * float(rate) if value is not None else 0.0
+            except (TypeError, ValueError):
+                return 0.0
+
+        df["market_value_cny"] = df.apply(to_cny, axis=1)
+
+        summary = []
+        for date, group in df.groupby("date"):
+            total = group["market_value_cny"].sum()
+            by_type = group.groupby("source_type")["market_value_cny"].sum()
+
+            weighted = group.dropna(subset=["annual_yield_rate", "market_value_cny"])
+            weighted = weighted[weighted["market_value_cny"] > 0]
+            avg_yield = None
+            if not weighted.empty:
+                try:
+                    avg_yield = (weighted["annual_yield_rate"] * weighted["market_value_cny"]).sum() / weighted["market_value_cny"].sum()
+                except Exception:
+                    avg_yield = None
+
+            summary.append({
+                "date": date,
+                "total_market_value_cny": float(total) if total is not None else 0.0,
+                "bank_market_value_cny": float(by_type.get("bank", 0.0)),
+                "financial_market_value_cny": float(by_type.get("financial", 0.0)),
+                "insurance_market_value_cny": float(by_type.get("insurance", 0.0)),
+                "fund_market_value_cny": float(by_type.get("fund", 0.0)),
+                "avg_annual_yield_rate": float(avg_yield) if avg_yield is not None else None,
+            })
+
+        return jsonify(serialize(summary))
+
+
+# ============================
 # 4. 未来现金流
 # ============================
 @app.route("/cashflows", methods=["GET"])

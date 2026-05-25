@@ -39,6 +39,7 @@ class _HomePageState extends State<HomePage> {
     final financialProducts = await ApiClient.getFinancialProducts();
     final insuranceProducts = await ApiClient.getInsurance();
     final fundProducts = await ApiClient.getFundProducts();
+    final positionsSummary = await ApiClient.getPositionsSummary();
 
     final todayStr = _todayStr();
 
@@ -128,6 +129,9 @@ class _HomePageState extends State<HomePage> {
       );
     }
 
+    final marketValueSeries = _buildSeries(positionsSummary);
+    final avgYieldSeries = _buildYieldSeries(positionsSummary);
+
     return _DashboardData(
       totalAssets: (summary['total_assets'] as num?)?.toDouble() ?? 0,
       future6mCf: availableDeposit + availableFinancial + availableFund,
@@ -140,6 +144,8 @@ class _HomePageState extends State<HomePage> {
       availableFund: availableFund,
       assetsByAccount: byAccount,
       accountNames: accountNames,
+      marketValueSeries: marketValueSeries,
+      avgYieldSeries: avgYieldSeries,
     );
   }
 
@@ -164,6 +170,14 @@ class _HomePageState extends State<HomePage> {
                 const Text('资产总览', style: AppTextStyles.pageTitle),
                 const SizedBox(height: 16),
                 _buildSummaryCards(data),
+                const SizedBox(height: 24),
+                const Text('市值趋势', style: AppTextStyles.sectionTitle),
+                const SizedBox(height: 8),
+                _buildMarketValueChart(data),
+                const SizedBox(height: 24),
+                const Text('平均年化收益率趋势', style: AppTextStyles.sectionTitle),
+                const SizedBox(height: 8),
+                _buildYieldChart(data),
                 const SizedBox(height: 24),
                 const Text('资产分布（按账户）', style: AppTextStyles.sectionTitle),
                 const SizedBox(height: 8),
@@ -268,6 +282,123 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  Widget _buildMarketValueChart(_DashboardData d) {
+    if (d.marketValueSeries.isEmpty) {
+      return const Text('暂无历史持仓汇总');
+    }
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              height: 180,
+              width: double.infinity,
+              child: CustomPaint(
+                painter: _MultiLineChartPainter(
+                  series: d.marketValueSeries,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            _buildLegend(d.marketValueSeries),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildYieldChart(_DashboardData d) {
+    if (d.avgYieldSeries.points.isEmpty) {
+      return const Text('暂无年化收益率数据');
+    }
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              height: 140,
+              width: double.infinity,
+              child: CustomPaint(
+                painter: _MultiLineChartPainter(
+                  series: [d.avgYieldSeries],
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            _buildLegend([d.avgYieldSeries]),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLegend(List<_DailySeries> series) {
+    return Wrap(
+      spacing: 12,
+      runSpacing: 4,
+      children: series.map((s) {
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(width: 10, height: 2, color: s.color),
+            const SizedBox(width: 6),
+            Text(s.label, style: AppTextStyles.hint),
+          ],
+        );
+      }).toList(),
+    );
+  }
+
+  List<_DailySeries> _buildSeries(List<dynamic> rows) {
+    final total = <_DailyPoint>[];
+    final bank = <_DailyPoint>[];
+    final financial = <_DailyPoint>[];
+    final insurance = <_DailyPoint>[];
+    final fund = <_DailyPoint>[];
+    for (final row in rows) {
+      final m = row as Map<String, dynamic>;
+      final dateStr = m['date'] as String?;
+      if (dateStr == null || dateStr.isEmpty) continue;
+      final date = DateTime.parse(dateStr);
+      total.add(_DailyPoint(date, (m['total_market_value_cny'] as num?)?.toDouble() ?? 0));
+      bank.add(_DailyPoint(date, (m['bank_market_value_cny'] as num?)?.toDouble() ?? 0));
+      financial.add(_DailyPoint(date, (m['financial_market_value_cny'] as num?)?.toDouble() ?? 0));
+      insurance.add(_DailyPoint(date, (m['insurance_market_value_cny'] as num?)?.toDouble() ?? 0));
+      fund.add(_DailyPoint(date, (m['fund_market_value_cny'] as num?)?.toDouble() ?? 0));
+    }
+    total.sort((a, b) => a.date.compareTo(b.date));
+    bank.sort((a, b) => a.date.compareTo(b.date));
+    financial.sort((a, b) => a.date.compareTo(b.date));
+    insurance.sort((a, b) => a.date.compareTo(b.date));
+    fund.sort((a, b) => a.date.compareTo(b.date));
+    return [
+      _DailySeries('总市值', total, Colors.blue),
+      _DailySeries('存款', bank, Colors.teal),
+      _DailySeries('理财', financial, Colors.orange),
+      _DailySeries('保险', insurance, Colors.purple),
+      _DailySeries('基金', fund, Colors.green),
+    ];
+  }
+
+  _DailySeries _buildYieldSeries(List<dynamic> rows) {
+    final points = <_DailyPoint>[];
+    for (final row in rows) {
+      final m = row as Map<String, dynamic>;
+      final dateStr = m['date'] as String?;
+      if (dateStr == null || dateStr.isEmpty) continue;
+      final date = DateTime.parse(dateStr);
+      final value = (m['avg_annual_yield_rate'] as num?)?.toDouble();
+      if (value == null) continue;
+      points.add(_DailyPoint(date, value));
+    }
+    points.sort((a, b) => a.date.compareTo(b.date));
+    return _DailySeries('平均年化收益率', points, Colors.redAccent);
+  }
+
 
 }
 
@@ -284,6 +415,8 @@ class _DashboardData {
   final double availableFund;
   final Map<int, _AccountAssetBreakdown> assetsByAccount;
   final Map<int, String> accountNames;
+  final List<_DailySeries> marketValueSeries;
+  final _DailySeries avgYieldSeries;
 
   _DashboardData({
     required this.totalAssets,
@@ -297,6 +430,8 @@ class _DashboardData {
     required this.availableFund,
     required this.assetsByAccount,
     required this.accountNames,
+    required this.marketValueSeries,
+    required this.avgYieldSeries,
   }) : availableInsurance = 0;
 }
 
@@ -339,5 +474,70 @@ class _AccountAssetBreakdown {
     if (insurance != 0) parts.add('保险 ${insurance.toStringAsFixed(2)}');
     if (fund != 0) parts.add('基金 ${fund.toStringAsFixed(2)}');
     return parts.join(' · ');
+  }
+}
+
+class _DailyPoint {
+  final DateTime date;
+  final double value;
+
+  _DailyPoint(this.date, this.value);
+}
+
+class _DailySeries {
+  final String label;
+  final List<_DailyPoint> points;
+  final Color color;
+
+  _DailySeries(this.label, this.points, this.color);
+}
+
+class _MultiLineChartPainter extends CustomPainter {
+  final List<_DailySeries> series;
+
+  _MultiLineChartPainter({required this.series});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (series.isEmpty) {
+      return;
+    }
+    final allPoints = series.expand((s) => s.points).toList();
+    if (allPoints.length < 2) return;
+    allPoints.sort((a, b) => a.date.compareTo(b.date));
+    final minDate = allPoints.first.date;
+    final maxDate = allPoints.last.date;
+    final minValue = allPoints.map((p) => p.value).reduce((a, b) => a < b ? a : b);
+    final maxValue = allPoints.map((p) => p.value).reduce((a, b) => a > b ? a : b);
+    final valueRange = (maxValue - minValue).abs();
+    final dayRange = maxDate.difference(minDate).inDays;
+    final effectiveDayRange = dayRange == 0 ? 1 : dayRange;
+
+    for (final s in series) {
+      if (s.points.length < 2) continue;
+      final paintLine = Paint()
+        ..color = s.color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2;
+
+      final path = Path();
+      for (var i = 0; i < s.points.length; i++) {
+        final p = s.points[i];
+        final dx = (p.date.difference(minDate).inDays / effectiveDayRange) * size.width;
+        final normalized = valueRange == 0 ? 0.5 : (p.value - minValue) / valueRange;
+        final dy = size.height - (normalized * size.height);
+        if (i == 0) {
+          path.moveTo(dx, dy);
+        } else {
+          path.lineTo(dx, dy);
+        }
+      }
+      canvas.drawPath(path, paintLine);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _MultiLineChartPainter oldDelegate) {
+    return oldDelegate.series != series;
   }
 }
