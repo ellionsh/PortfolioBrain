@@ -662,7 +662,7 @@ def positions():
             ORDER BY date DESC
             LIMIT 200
         """), session.bind)
-        return df.to_dict(orient="records")
+        return jsonify(serialize(df.to_dict(orient="records")))
 
 
 # ============================
