@@ -371,7 +371,7 @@ def get_financial_products():
                         except (TypeError, ValueError):
                             fee_value = 0.0
                     if trade_type == "buy":
-                        signed_amount = -abs(amount_value) - fee_value
+                        signed_amount = -abs(amount_value)
                     else:
                         signed_amount = abs(amount_value) - fee_value
                     cashflow_map.setdefault(product_id, []).append((trade_date, signed_amount))
@@ -457,7 +457,7 @@ def get_fund_products():
                     except (TypeError, ValueError):
                         fee_value = 0.0
                 if trade_type == "buy":
-                    signed_amount = -abs(amount_value) - fee_value
+                    signed_amount = -abs(amount_value)
                 else:
                     signed_amount = abs(amount_value) - fee_value
                 cashflow_map.setdefault(fund_id, []).append((trade_date, signed_amount))

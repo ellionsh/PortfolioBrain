@@ -2,6 +2,7 @@
 # scripts/generate_positions_snapshot.py
 import argparse
 import datetime as dt
+import math
 from decimal import Decimal
 
 from sqlalchemy import text
@@ -117,30 +118,41 @@ def build_rows(snap_date: dt.date):
         for r in fin_tx_rows:
             if r.trade_date is None:
                 continue
-            amt = float(r.amount) if r.amount is not None else 0.0
+            try:
+                amount_value = float(r.amount) if r.amount is not None else 0.0
+            except (TypeError, ValueError):
+                continue
+            fee_value = 0.0
+            if r.fee is not None:
+                try:
+                    fee_value = float(r.fee)
+                except (TypeError, ValueError):
+                    fee_value = 0.0
             if r.trade_type == "buy":
-                amt = -amt
-            elif r.trade_type in ("sell", "dividend"):
-                amt = amt
+                signed_amount = -abs(amount_value)
             else:
-                amt = 0.0
-            fin_cashflows.setdefault(r.product_id, []).append((r.trade_date, amt))
+                signed_amount = abs(amount_value) - fee_value
+            fin_cashflows.setdefault(r.product_id, []).append((r.trade_date, signed_amount))
 
         fund_cashflows = {}
         for r in fund_tx_rows:
             if r.trade_date is None:
                 continue
-            amt = float(r.amount) if r.amount is not None else 0.0
-            fee = float(r.fee) if r.fee is not None else 0.0
+            try:
+                amount_value = float(r.amount) if r.amount is not None else 0.0
+            except (TypeError, ValueError):
+                continue
+            fee_value = 0.0
+            if r.fee is not None:
+                try:
+                    fee_value = float(r.fee)
+                except (TypeError, ValueError):
+                    fee_value = 0.0
             if r.trade_type == "buy":
-                amt = -amt
-            elif r.trade_type in ("sell", "dividend"):
-                amt = amt
+                signed_amount = -abs(amount_value)
             else:
-                amt = 0.0
-            if fee:
-                fund_cashflows.setdefault(r.fund_id, []).append((r.trade_date, -fee))
-            fund_cashflows.setdefault(r.fund_id, []).append((r.trade_date, amt))
+                signed_amount = abs(amount_value) - fee_value
+            fund_cashflows.setdefault(r.fund_id, []).append((r.trade_date, signed_amount))
 
         rows = []
 
@@ -186,7 +198,7 @@ def build_rows(snap_date: dt.date):
             if r.is_nav_based:
                 market_value = Decimal(str(shares)) * nav if (shares is not None and nav is not None) else None
             else:
-                market_value = principal
+                market_value = Decimal(str(shares)) if shares is not None else None
             cost = principal if principal is not None else market_value
             irr = None
             if market_value is not None:
