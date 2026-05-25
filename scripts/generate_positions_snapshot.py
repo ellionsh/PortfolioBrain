@@ -162,7 +162,6 @@ def build_rows(snap_date: dt.date):
             FROM bank_deposits
             WHERE status='active'
               AND (start_date IS NULL OR start_date <= :d)
-              AND (end_date IS NULL OR end_date >= :d)
         """), {"d": snap_date}).fetchall()
 
         for r in bank_rows:
@@ -188,7 +187,6 @@ def build_rows(snap_date: dt.date):
             FROM financial_products
             WHERE status='active'
               AND (start_date IS NULL OR start_date <= :d)
-              AND (end_date IS NULL OR end_date >= :d)
         """), {"d": snap_date}).fetchall()
 
         for r in fin_rows:
@@ -227,7 +225,6 @@ def build_rows(snap_date: dt.date):
             FROM fund_products
             WHERE status='active'
               AND (start_date IS NULL OR start_date <= :d)
-              AND (end_date IS NULL OR end_date >= :d)
         """), {"d": snap_date}).fetchall()
 
         for r in fund_rows:
@@ -263,7 +260,6 @@ def build_rows(snap_date: dt.date):
             FROM insurance_products
             WHERE status='active'
               AND (start_date IS NULL OR start_date <= :d)
-              AND (end_date IS NULL OR end_date >= :d)
         """), {"d": snap_date}).fetchall()
 
         for r in ins_rows:
@@ -278,7 +274,7 @@ def build_rows(snap_date: dt.date):
                 "shares": None,
                 "cost": cash_value if cash_value is not None else r.premium,
                 "market_value": cash_value,
-                "annual_yield_rate": None,
+                "annual_yield_rate": 0.025,
                 "currency": r.currency or "CNY",
                 "update_time": now,
             })
