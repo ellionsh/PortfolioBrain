@@ -9,43 +9,61 @@ from sqlalchemy import text
 from db.db import session_scope
 
 
-def xirr(cashflows, guess=0.1, max_iter=100, tol=1e-6):
+def _xnpv(rate, cashflows):
+    t0 = cashflows[0][0]
+    total = 0.0
+    for d, amt in cashflows:
+        days = (d - t0).days / 365
+        total += amt / ((1 + rate) ** days)
+    return total
+
+
+def xirr(cashflows):
     if not cashflows or len(cashflows) < 2:
         return None
-    dates = [cf[0] for cf in cashflows]
-    amounts = [Decimal(str(cf[1])) for cf in cashflows]
-    if all(a == 0 for a in amounts):
+    cashflows = sorted(cashflows, key=lambda x: x[0])
+    amounts = [amt for _, amt in cashflows]
+    if all(a >= 0 for a in amounts) or all(a <= 0 for a in amounts):
         return None
-    min_date = min(dates)
-    days = [Decimal((d - min_date).days) for d in dates]
 
-    def npv(rate):
-        r = Decimal(str(rate))
-        total = Decimal("0")
-        for amt, day in zip(amounts, days):
-            total += amt / (Decimal("1") + r) ** (day / Decimal("365"))
-        return total
-
-    def d_npv(rate):
-        r = Decimal(str(rate))
-        total = Decimal("0")
-        for amt, day in zip(amounts, days):
-            exp = (day / Decimal("365"))
-            total += -exp * amt / (Decimal("1") + r) ** (exp + Decimal("1"))
-        return total
-
-    rate = Decimal(str(guess))
-    for _ in range(max_iter):
-        f = npv(rate)
-        if abs(f) < Decimal(str(tol)):
-            return rate
-        fp = d_npv(rate)
-        if fp == 0:
+    guess = 0.1
+    for _ in range(100):
+        f = _xnpv(guess, cashflows)
+        if abs(f) < 1e-6:
+            return guess
+        t0 = cashflows[0][0]
+        df = 0.0
+        for d, amt in cashflows:
+            days = (d - t0).days / 365
+            df -= (days * amt) / ((1 + guess) ** (days + 1))
+        if df == 0:
             break
-        rate = rate - f / fp
-        if rate <= Decimal("-0.9999"):
-            break
-    return None
+        guess = guess - f / df
+        if guess <= -0.999999:
+            guess = -0.999999
+
+    low, high = -0.9999, 10.0
+    f_low = _xnpv(low, cashflows)
+    f_high = _xnpv(high, cashflows)
+    if f_low == 0:
+        return low
+    if f_high == 0:
+        return high
+    if f_low * f_high > 0:
+        return None
+    mid = None
+    for _ in range(100):
+        mid = (low + high) / 2
+        f_mid = _xnpv(mid, cashflows)
+        if abs(f_mid) < 1e-6:
+            return mid
+        if f_low * f_mid < 0:
+            high = mid
+            f_high = f_mid
+        else:
+            low = mid
+            f_low = f_mid
+    return mid
 
 
 def parse_date(value: str) -> dt.date:
@@ -99,27 +117,27 @@ def build_rows(snap_date: dt.date):
         for r in fin_tx_rows:
             if r.trade_date is None:
                 continue
-            amt = Decimal(str(r.amount)) if r.amount is not None else Decimal("0")
+            amt = float(r.amount) if r.amount is not None else 0.0
             if r.trade_type == "buy":
                 amt = -amt
             elif r.trade_type in ("sell", "dividend"):
                 amt = amt
             else:
-                amt = Decimal("0")
+                amt = 0.0
             fin_cashflows.setdefault(r.product_id, []).append((r.trade_date, amt))
 
         fund_cashflows = {}
         for r in fund_tx_rows:
             if r.trade_date is None:
                 continue
-            amt = Decimal(str(r.amount)) if r.amount is not None else Decimal("0")
-            fee = Decimal(str(r.fee)) if r.fee is not None else Decimal("0")
+            amt = float(r.amount) if r.amount is not None else 0.0
+            fee = float(r.fee) if r.fee is not None else 0.0
             if r.trade_type == "buy":
                 amt = -amt
             elif r.trade_type in ("sell", "dividend"):
                 amt = amt
             else:
-                amt = Decimal("0")
+                amt = 0.0
             if fee:
                 fund_cashflows.setdefault(r.fund_id, []).append((r.trade_date, -fee))
             fund_cashflows.setdefault(r.fund_id, []).append((r.trade_date, amt))
@@ -173,7 +191,7 @@ def build_rows(snap_date: dt.date):
             irr = None
             if market_value is not None:
                 cfs = list(fin_cashflows.get(r.id, []))
-                cfs.append((snap_date, market_value))
+                cfs.append((snap_date, float(market_value)))
                 irr = xirr(cfs)
             rows.append({
                 "date": snap_date,
@@ -209,7 +227,7 @@ def build_rows(snap_date: dt.date):
             irr = None
             if market_value is not None:
                 cfs = list(fund_cashflows.get(r.id, []))
-                cfs.append((snap_date, market_value))
+                cfs.append((snap_date, float(market_value)))
                 irr = xirr(cfs)
             rows.append({
                 "date": snap_date,
