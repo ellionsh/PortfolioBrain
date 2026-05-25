@@ -702,14 +702,23 @@ def positions_summary():
             total = group["market_value_cny"].sum()
             by_type = group.groupby("source_type")["market_value_cny"].sum()
 
-            weighted = group.dropna(subset=["annual_yield_rate", "market_value_cny"])
-            weighted = weighted[weighted["market_value_cny"] > 0]
-            avg_yield = None
-            if not weighted.empty:
+            def weighted_avg(df_sub):
+                if df_sub is None or df_sub.empty:
+                    return None
+                df_sub = df_sub.dropna(subset=["annual_yield_rate", "market_value_cny"])
+                df_sub = df_sub[df_sub["market_value_cny"] > 0]
+                if df_sub.empty:
+                    return None
                 try:
-                    avg_yield = (weighted["annual_yield_rate"] * weighted["market_value_cny"]).sum() / weighted["market_value_cny"].sum()
+                    return (df_sub["annual_yield_rate"] * df_sub["market_value_cny"]).sum() / df_sub["market_value_cny"].sum()
                 except Exception:
-                    avg_yield = None
+                    return None
+
+            avg_yield_total = weighted_avg(group)
+            avg_yield_bank = weighted_avg(group[group["source_type"] == "bank"])
+            avg_yield_financial = weighted_avg(group[group["source_type"] == "financial"])
+            avg_yield_insurance = weighted_avg(group[group["source_type"] == "insurance"])
+            avg_yield_fund = weighted_avg(group[group["source_type"] == "fund"])
 
             summary.append({
                 "date": date,
@@ -718,7 +727,11 @@ def positions_summary():
                 "financial_market_value_cny": float(by_type.get("financial", 0.0)),
                 "insurance_market_value_cny": float(by_type.get("insurance", 0.0)),
                 "fund_market_value_cny": float(by_type.get("fund", 0.0)),
-                "avg_annual_yield_rate": float(avg_yield) if avg_yield is not None else None,
+                "avg_annual_yield_rate_total": float(avg_yield_total) if avg_yield_total is not None else None,
+                "avg_annual_yield_rate_bank": float(avg_yield_bank) if avg_yield_bank is not None else None,
+                "avg_annual_yield_rate_financial": float(avg_yield_financial) if avg_yield_financial is not None else None,
+                "avg_annual_yield_rate_insurance": float(avg_yield_insurance) if avg_yield_insurance is not None else None,
+                "avg_annual_yield_rate_fund": float(avg_yield_fund) if avg_yield_fund is not None else None,
             })
 
         return jsonify(serialize(summary))

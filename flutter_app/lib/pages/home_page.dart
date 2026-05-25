@@ -302,7 +302,7 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
             const SizedBox(height: 8),
-            _buildLegend(d.marketValueSeries),
+            _buildLegend(d.marketValueSeries, showValue: true),
           ],
         ),
       ),
@@ -310,7 +310,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildYieldChart(_DashboardData d) {
-    if (d.avgYieldSeries.points.isEmpty) {
+    if (d.avgYieldSeries.isEmpty) {
       return const Text('暂无年化收益率数据');
     }
     return Card(
@@ -324,29 +324,31 @@ class _HomePageState extends State<HomePage> {
               width: double.infinity,
               child: CustomPaint(
                 painter: _MultiLineChartPainter(
-                  series: [d.avgYieldSeries],
+                  series: d.avgYieldSeries,
                 ),
               ),
             ),
             const SizedBox(height: 8),
-            _buildLegend([d.avgYieldSeries]),
+            _buildLegend(d.avgYieldSeries, showValue: true, valueSuffix: '%'),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildLegend(List<_DailySeries> series) {
+  Widget _buildLegend(List<_DailySeries> series, {bool showValue = false, String valueSuffix = ''}) {
     return Wrap(
       spacing: 12,
       runSpacing: 4,
       children: series.map((s) {
+        final latest = s.points.isNotEmpty ? s.points.last.value : null;
+        final valueText = latest == null ? '' : ' ${latest.toStringAsFixed(2)}$valueSuffix';
         return Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(width: 10, height: 2, color: s.color),
             const SizedBox(width: 6),
-            Text(s.label, style: AppTextStyles.hint),
+            Text('${s.label}${showValue ? valueText : ''}', style: AppTextStyles.hint),
           ],
         );
       }).toList(),
@@ -384,19 +386,40 @@ class _HomePageState extends State<HomePage> {
     ];
   }
 
-  _DailySeries _buildYieldSeries(List<dynamic> rows) {
-    final points = <_DailyPoint>[];
+  List<_DailySeries> _buildYieldSeries(List<dynamic> rows) {
+    final total = <_DailyPoint>[];
+    final bank = <_DailyPoint>[];
+    final financial = <_DailyPoint>[];
+    final insurance = <_DailyPoint>[];
+    final fund = <_DailyPoint>[];
     for (final row in rows) {
       final m = row as Map<String, dynamic>;
       final dateStr = m['date'] as String?;
       if (dateStr == null || dateStr.isEmpty) continue;
       final date = DateTime.parse(dateStr);
-      final value = (m['avg_annual_yield_rate'] as num?)?.toDouble();
-      if (value == null) continue;
-      points.add(_DailyPoint(date, value));
+      final vTotal = (m['avg_annual_yield_rate_total'] as num?)?.toDouble();
+      final vBank = (m['avg_annual_yield_rate_bank'] as num?)?.toDouble();
+      final vFinancial = (m['avg_annual_yield_rate_financial'] as num?)?.toDouble();
+      final vInsurance = (m['avg_annual_yield_rate_insurance'] as num?)?.toDouble();
+      final vFund = (m['avg_annual_yield_rate_fund'] as num?)?.toDouble();
+      if (vTotal != null) total.add(_DailyPoint(date, vTotal * 100));
+      if (vBank != null) bank.add(_DailyPoint(date, vBank * 100));
+      if (vFinancial != null) financial.add(_DailyPoint(date, vFinancial * 100));
+      if (vInsurance != null) insurance.add(_DailyPoint(date, vInsurance * 100));
+      if (vFund != null) fund.add(_DailyPoint(date, vFund * 100));
     }
-    points.sort((a, b) => a.date.compareTo(b.date));
-    return _DailySeries('平均年化收益率', points, Colors.redAccent);
+    total.sort((a, b) => a.date.compareTo(b.date));
+    bank.sort((a, b) => a.date.compareTo(b.date));
+    financial.sort((a, b) => a.date.compareTo(b.date));
+    insurance.sort((a, b) => a.date.compareTo(b.date));
+    fund.sort((a, b) => a.date.compareTo(b.date));
+    return [
+      _DailySeries('总平均', total, Colors.redAccent),
+      _DailySeries('存款', bank, Colors.teal),
+      _DailySeries('理财', financial, Colors.orange),
+      _DailySeries('保险', insurance, Colors.purple),
+      _DailySeries('基金', fund, Colors.green),
+    ];
   }
 
 
@@ -416,7 +439,7 @@ class _DashboardData {
   final Map<int, _AccountAssetBreakdown> assetsByAccount;
   final Map<int, String> accountNames;
   final List<_DailySeries> marketValueSeries;
-  final _DailySeries avgYieldSeries;
+  final List<_DailySeries> avgYieldSeries;
 
   _DashboardData({
     required this.totalAssets,
