@@ -298,6 +298,8 @@ class _HomePageState extends State<HomePage> {
               child: CustomPaint(
                 painter: _MultiLineChartPainter(
                   series: d.marketValueSeries,
+                  valueSuffix: '',
+                  axisLabelStyle: AppTextStyles.hint.copyWith(fontSize: 10),
                 ),
               ),
             ),
@@ -325,6 +327,8 @@ class _HomePageState extends State<HomePage> {
               child: CustomPaint(
                 painter: _MultiLineChartPainter(
                   series: d.avgYieldSeries,
+                  valueSuffix: '%',
+                  axisLabelStyle: AppTextStyles.hint.copyWith(fontSize: 10),
                 ),
               ),
             ),
@@ -517,8 +521,20 @@ class _DailySeries {
 
 class _MultiLineChartPainter extends CustomPainter {
   final List<_DailySeries> series;
+  final String valueSuffix;
+  final TextStyle axisLabelStyle;
+  final Color axisColor;
+  final int yTickCount;
+  final int xTickCount;
 
-  _MultiLineChartPainter({required this.series});
+  _MultiLineChartPainter({
+    required this.series,
+    required this.valueSuffix,
+    required this.axisLabelStyle,
+    this.axisColor = Colors.grey,
+    this.yTickCount = 5,
+    this.xTickCount = 4,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -536,26 +552,110 @@ class _MultiLineChartPainter extends CustomPainter {
     final dayRange = maxDate.difference(minDate).inDays;
     final effectiveDayRange = dayRange == 0 ? 1 : dayRange;
 
+    const leftPadding = 46.0;
+    const rightPadding = 8.0;
+    const topPadding = 8.0;
+    const bottomPadding = 22.0;
+    final chartWidth = size.width - leftPadding - rightPadding;
+    final chartHeight = size.height - topPadding - bottomPadding;
+    if (chartWidth <= 0 || chartHeight <= 0) return;
+
+    final axisPaint = Paint()
+      ..color = axisColor
+      ..strokeWidth = 1;
+    final origin = Offset(leftPadding, size.height - bottomPadding);
+    canvas.drawLine(origin, Offset(leftPadding, topPadding), axisPaint);
+    canvas.drawLine(origin, Offset(size.width - rightPadding, size.height - bottomPadding), axisPaint);
+
+    String formatValue(double v) {
+      final absV = v.abs();
+      if (absV >= 100000000) {
+        return '${(v / 100000000).toStringAsFixed(1)}亿$valueSuffix';
+      }
+      if (absV >= 10000) {
+        return '${(v / 10000).toStringAsFixed(1)}万$valueSuffix';
+      }
+      return '${v.toStringAsFixed(2)}$valueSuffix';
+    }
+
+    String formatDate(DateTime d) {
+      final m = d.month.toString().padLeft(2, '0');
+      final day = d.day.toString().padLeft(2, '0');
+      return '$m/$day';
+    }
+
+    final yTicks = yTickCount < 2 ? 2 : yTickCount;
+    for (var i = 0; i < yTicks; i++) {
+      final t = i / (yTicks - 1);
+      final value = maxValue - (valueRange == 0 ? 0 : valueRange * t);
+      final y = topPadding + (chartHeight * t);
+      canvas.drawLine(
+        Offset(leftPadding - 4, y),
+        Offset(leftPadding, y),
+        axisPaint,
+      );
+      final label = formatValue(valueRange == 0 ? maxValue : value);
+      final tp = TextPainter(
+        text: TextSpan(text: label, style: axisLabelStyle),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      tp.paint(canvas, Offset(leftPadding - 6 - tp.width, y - tp.height / 2));
+    }
+
+    final xTicks = xTickCount < 2 ? 2 : xTickCount;
+    for (var i = 0; i < xTicks; i++) {
+      final t = i / (xTicks - 1);
+      final x = leftPadding + (chartWidth * t);
+      canvas.drawLine(
+        Offset(x, size.height - bottomPadding),
+        Offset(x, size.height - bottomPadding + 4),
+        axisPaint,
+      );
+      final date = minDate.add(Duration(days: (dayRange * t).round()));
+      final label = formatDate(date);
+      final tp = TextPainter(
+        text: TextSpan(text: label, style: axisLabelStyle),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      tp.paint(canvas, Offset(x - tp.width / 2, size.height - bottomPadding + 4));
+    }
+
     for (final s in series) {
-      if (s.points.length < 2) continue;
       final paintLine = Paint()
         ..color = s.color
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2;
+        ..strokeWidth = 2
+        ..strokeCap = StrokeCap.round
+        ..isAntiAlias = true;
 
       final path = Path();
       for (var i = 0; i < s.points.length; i++) {
         final p = s.points[i];
-        final dx = (p.date.difference(minDate).inDays / effectiveDayRange) * size.width;
+        final dx = leftPadding +
+            (p.date.difference(minDate).inDays / effectiveDayRange) * chartWidth;
         final normalized = valueRange == 0 ? 0.5 : (p.value - minValue) / valueRange;
-        final dy = size.height - (normalized * size.height);
+        final dy = topPadding + ((1 - normalized) * chartHeight);
         if (i == 0) {
           path.moveTo(dx, dy);
         } else {
           path.lineTo(dx, dy);
         }
       }
-      canvas.drawPath(path, paintLine);
+      if (s.points.length >= 2) {
+        canvas.drawPath(path, paintLine);
+      }
+      final pointPaint = Paint()
+        ..color = s.color
+        ..style = PaintingStyle.fill
+        ..isAntiAlias = true;
+      for (var i = 0; i < s.points.length; i++) {
+        final p = s.points[i];
+        final dx = leftPadding +
+            (p.date.difference(minDate).inDays / effectiveDayRange) * chartWidth;
+        final normalized = valueRange == 0 ? 0.5 : (p.value - minValue) / valueRange;
+        final dy = topPadding + ((1 - normalized) * chartHeight);
+        canvas.drawCircle(Offset(dx, dy), 2.5, pointPaint);
+      }
     }
   }
 

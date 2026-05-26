@@ -16,7 +16,7 @@ AGENT_SYSTEM_PROMPT = """
 主要表：
 accounts, bank_deposits, financial_products, financial_transactions,
 financial_navs, fund_products, fund_transactions, fund_navs,
-insurance_products, fx_rates
+insurance_products, fx_rates, positions
 
 操作规则（关键映射）：
 - 更新存款余额/本金 -> bank_deposit_update_principal
