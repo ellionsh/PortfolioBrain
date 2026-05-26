@@ -1,4 +1,4 @@
-import 'package:shared_preferences/shared_preferences.dart';
+import 'simple_prefs.dart';
 
 class ApiServerConfig {
   static const _hostKey = 'api_server_host';
@@ -27,10 +27,9 @@ class ApiServerConfig {
   );
 
   static Future<ApiServerConfig> load() async {
-    final prefs = await SharedPreferences.getInstance();
-    final host = prefs.getString(_hostKey);
-    final port = prefs.getInt(_portKey);
-    final scheme = prefs.getString(_schemeKey) ?? defaults.scheme;
+    final host = await SimplePrefs.getString(_hostKey);
+    final port = await SimplePrefs.getInt(_portKey);
+    final scheme = await SimplePrefs.getString(_schemeKey) ?? defaults.scheme;
 
     if (host == null || host.trim().isEmpty || port == null) {
       return defaults;
@@ -57,17 +56,15 @@ class ApiServerConfig {
       isConfigured: true,
     );
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_hostKey, config.host);
-    await prefs.setInt(_portKey, config.port);
-    await prefs.setString(_schemeKey, config.scheme);
+    await SimplePrefs.setString(_hostKey, config.host);
+    await SimplePrefs.setInt(_portKey, config.port);
+    await SimplePrefs.setString(_schemeKey, config.scheme);
     return config;
   }
 
   static Future<void> clear() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_hostKey);
-    await prefs.remove(_portKey);
-    await prefs.remove(_schemeKey);
+    await SimplePrefs.remove(_hostKey);
+    await SimplePrefs.remove(_portKey);
+    await SimplePrefs.remove(_schemeKey);
   }
 }

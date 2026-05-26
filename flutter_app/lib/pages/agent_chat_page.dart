@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../api/api_client.dart';
+import '../api/simple_prefs.dart';
 import '../utils/error_format.dart';
 import '../theme/app_text_styles.dart';
 
@@ -111,14 +111,13 @@ class _AgentChatPageState extends State<AgentChatPage> {
   }
 
   Future<void> _loadHistory() async {
-    final prefs = await SharedPreferences.getInstance();
-    final initialized = prefs.getBool(_historyInitKey) ?? false;
+    final initialized = await SimplePrefs.getBool(_historyInitKey) ?? false;
     if (!initialized) {
-      await prefs.remove(_historyKey);
-      await prefs.setBool(_historyInitKey, true);
+      await SimplePrefs.remove(_historyKey);
+      await SimplePrefs.setBool(_historyInitKey, true);
       return;
     }
-    final raw = prefs.getString(_historyKey);
+    final raw = await SimplePrefs.getString(_historyKey);
     if (raw == null || raw.isEmpty) return;
     try {
       final List<dynamic> decoded = jsonDecode(raw);
@@ -139,14 +138,12 @@ class _AgentChatPageState extends State<AgentChatPage> {
   }
 
   Future<void> _saveHistory() async {
-    final prefs = await SharedPreferences.getInstance();
     final data = _messages.map((m) => m.toJson()).toList();
-    await prefs.setString(_historyKey, jsonEncode(data));
+    await SimplePrefs.setString(_historyKey, jsonEncode(data));
   }
 
   Future<void> _clearHistory() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_historyKey);
+    await SimplePrefs.remove(_historyKey);
     setState(() {
       _messages.clear();
       _showNewMessage = false;
