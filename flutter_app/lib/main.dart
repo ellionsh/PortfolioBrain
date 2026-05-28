@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import 'api/api_client.dart';
@@ -21,6 +24,7 @@ Future<void> main() async {
   final config = await ApiServerConfig.load();
   final accessToken = await AuthStorage.loadAccessToken();
   final refreshToken = await AuthStorage.loadRefreshToken();
+  final themeMode = await _loadThemeMode();
 
   ApiClient.configure(
     host: config.host,
@@ -30,20 +34,90 @@ Future<void> main() async {
   ApiClient.setTokens(accessToken, refreshToken);
 
   runApp(
-    PortfolioBrainApp(initialConfig: config, initialToken: accessToken, initialRefreshToken: refreshToken),
+    PortfolioBrainApp(
+      initialConfig: config,
+      initialToken: accessToken,
+      initialRefreshToken: refreshToken,
+      initialThemeMode: themeMode,
+    ),
   );
+}
+
+const _themeModeKey = 'theme_mode';
+const _prefsFileName = 'pb_prefs.json';
+
+File _prefsFile() {
+  return File('${Directory.systemTemp.path}/$_prefsFileName');
+}
+
+Future<ThemeMode> _loadThemeMode() async {
+  try {
+    final file = _prefsFile();
+    if (!await file.exists()) {
+      return ThemeMode.system;
+    }
+    final raw = await file.readAsString();
+    if (raw.trim().isEmpty) {
+      return ThemeMode.system;
+    }
+    final data = jsonDecode(raw);
+    if (data is! Map<String, dynamic>) {
+      return ThemeMode.system;
+    }
+    final value = data[_themeModeKey];
+    if (value is! String) {
+      return ThemeMode.system;
+    }
+    switch (value) {
+      case 'light':
+        return ThemeMode.light;
+      case 'dark':
+        return ThemeMode.dark;
+      default:
+        return ThemeMode.system;
+    }
+  } catch (_) {
+    return ThemeMode.system;
+  }
+}
+
+Future<void> _saveThemeMode(ThemeMode mode) async {
+  final value = switch (mode) {
+    ThemeMode.light => 'light',
+    ThemeMode.dark => 'dark',
+    _ => 'system',
+  };
+  try {
+    final file = _prefsFile();
+    Map<String, dynamic> data = {};
+    if (await file.exists()) {
+      final raw = await file.readAsString();
+      if (raw.trim().isNotEmpty) {
+        final parsed = jsonDecode(raw);
+        if (parsed is Map<String, dynamic>) {
+          data = parsed;
+        }
+      }
+    }
+    data[_themeModeKey] = value;
+    await file.writeAsString(jsonEncode(data));
+  } catch (_) {
+    // ignore persistence errors
+  }
 }
 
 class PortfolioBrainApp extends StatefulWidget {
   final ApiServerConfig initialConfig;
   final String? initialToken;
   final String? initialRefreshToken;
+  final ThemeMode initialThemeMode;
 
   const PortfolioBrainApp({
     super.key,
     required this.initialConfig,
     required this.initialToken,
     required this.initialRefreshToken,
+    required this.initialThemeMode,
   });
 
   @override
@@ -55,6 +129,7 @@ class _PortfolioBrainAppState extends State<PortfolioBrainApp> {
 
   late ApiServerConfig _config;
   String? _token;
+  ThemeMode _themeMode = ThemeMode.system;
   int _configVersion = 0;
   int _homeReloadVersion = 0;
 
@@ -64,6 +139,7 @@ class _PortfolioBrainAppState extends State<PortfolioBrainApp> {
 
     _config = widget.initialConfig;
     _token = widget.initialToken;
+    _themeMode = widget.initialThemeMode;
   }
 
   void _applyConfig(ApiServerConfig config) {
@@ -91,6 +167,14 @@ class _PortfolioBrainAppState extends State<PortfolioBrainApp> {
     setState(() {
       _token = accessToken;
       _index = 0;
+    });
+  }
+
+  Future<void> _setThemeMode(ThemeMode mode) async {
+    await _saveThemeMode(mode);
+    if (!mounted) return;
+    setState(() {
+      _themeMode = mode;
     });
   }
 
@@ -170,6 +254,25 @@ class _PortfolioBrainAppState extends State<PortfolioBrainApp> {
           labelSmall: TextStyle(fontSize: 12),
         ),
       ),
+      darkTheme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.indigo,
+          brightness: Brightness.dark,
+        ),
+        useMaterial3: true,
+        textTheme: const TextTheme(
+          titleLarge: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          titleMedium: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          titleSmall: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          bodyLarge: TextStyle(fontSize: 14),
+          bodyMedium: TextStyle(fontSize: 14),
+          bodySmall: TextStyle(fontSize: 11),
+          labelLarge: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+          labelMedium: TextStyle(fontSize: 13),
+          labelSmall: TextStyle(fontSize: 12),
+        ),
+      ),
+      themeMode: _themeMode,
 
       home: _config.isConfigured
           ? (_token == null
@@ -187,6 +290,41 @@ class _PortfolioBrainAppState extends State<PortfolioBrainApp> {
                       appBar: AppBar(
                         title: const Text('AI资产管理'),
                         actions: [
+                          PopupMenuButton<ThemeMode>(
+                            tooltip: '主题模式',
+                            initialValue: _themeMode,
+                            onSelected: _setThemeMode,
+                            icon: Icon(
+                              switch (_themeMode) {
+                                ThemeMode.light => Icons.light_mode_outlined,
+                                ThemeMode.dark => Icons.dark_mode_outlined,
+                                _ => Icons.brightness_auto_outlined,
+                              },
+                            ),
+                            itemBuilder: (context) => const [
+                              PopupMenuItem(
+                                value: ThemeMode.system,
+                                child: ListTile(
+                                  leading: Icon(Icons.brightness_auto_outlined),
+                                  title: Text('跟随系统'),
+                                ),
+                              ),
+                              PopupMenuItem(
+                                value: ThemeMode.light,
+                                child: ListTile(
+                                  leading: Icon(Icons.light_mode_outlined),
+                                  title: Text('浅色'),
+                                ),
+                              ),
+                              PopupMenuItem(
+                                value: ThemeMode.dark,
+                                child: ListTile(
+                                  leading: Icon(Icons.dark_mode_outlined),
+                                  title: Text('深色'),
+                                ),
+                              ),
+                            ],
+                          ),
                           IconButton(
                             tooltip: '服务器配置',
                             onPressed: () => _openServerConfig(context),
