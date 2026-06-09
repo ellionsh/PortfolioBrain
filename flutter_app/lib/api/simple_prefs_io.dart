@@ -1,14 +1,28 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:path_provider/path_provider.dart';
+
 class SimplePrefs {
+  static const _prefsFileName = 'pb_prefs.json';
   static Map<String, dynamic>? _cache;
   static File? _file;
 
   static Future<void> _ensureLoaded() async {
     if (_cache != null) return;
-    final dir = Directory.systemTemp;
-    _file = File('${dir.path}/pb_prefs.json');
+    final dir = await getApplicationSupportDirectory();
+    if (!await dir.exists()) {
+      await dir.create(recursive: true);
+    }
+    _file = File('${dir.path}/$_prefsFileName');
+    final legacyFile = File('${Directory.systemTemp.path}/$_prefsFileName');
+    if (!await _file!.exists() && await legacyFile.exists()) {
+      try {
+        await legacyFile.copy(_file!.path);
+      } catch (_) {
+        // If migration fails, fall back to an empty preference store.
+      }
+    }
     if (await _file!.exists()) {
       final content = await _file!.readAsString();
       _cache = jsonDecode(content) as Map<String, dynamic>;

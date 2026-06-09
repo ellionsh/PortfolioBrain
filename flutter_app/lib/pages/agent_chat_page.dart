@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'dart:convert';
 import '../api/api_client.dart';
@@ -15,7 +16,6 @@ class AgentChatPage extends StatefulWidget {
 
 class _AgentChatPageState extends State<AgentChatPage> {
   static const String _historyKey = 'agent_chat_history';
-  static const String _historyInitKey = 'agent_chat_history_initialized';
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final List<_Message> _messages = [];
@@ -111,12 +111,6 @@ class _AgentChatPageState extends State<AgentChatPage> {
   }
 
   Future<void> _loadHistory() async {
-    final initialized = await SimplePrefs.getBool(_historyInitKey) ?? false;
-    if (!initialized) {
-      await SimplePrefs.remove(_historyKey);
-      await SimplePrefs.setBool(_historyInitKey, true);
-      return;
-    }
     final raw = await SimplePrefs.getString(_historyKey);
     if (raw == null || raw.isEmpty) return;
     try {
@@ -244,12 +238,35 @@ class _AgentChatPageState extends State<AgentChatPage> {
                           color: color,
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: m.role == 'assistant'
-                            ? MarkdownBody(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (m.role == 'assistant')
+                              MarkdownBody(
                                 data: m.content,
                                 selectable: true,
                               )
-                            : SelectableText(m.content),
+                            else
+                              SelectableText(m.content),
+                            const SizedBox(height: 4),
+                            GestureDetector(
+                              onTap: () {
+                                Clipboard.setData(ClipboardData(text: m.content));
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('已复制'),
+                                    duration: Duration(seconds: 1),
+                                  ),
+                                );
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.all(2),
+                                child: Icon(Icons.copy, size: 14, color: Colors.grey[400]),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     );
                   },

@@ -1,12 +1,10 @@
-import 'dart:convert';
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 
 import 'api/api_client.dart';
 import 'api/api_server_config.dart';
 import 'api/auth_storage.dart';
 import 'api/release_bootstrap.dart';
+import 'api/simple_prefs.dart';
 
 import 'pages/home_page.dart';
 import 'pages/accounts_page.dart';
@@ -44,27 +42,10 @@ Future<void> main() async {
 }
 
 const _themeModeKey = 'theme_mode';
-const _prefsFileName = 'pb_prefs.json';
-
-File _prefsFile() {
-  return File('${Directory.systemTemp.path}/$_prefsFileName');
-}
 
 Future<ThemeMode> _loadThemeMode() async {
   try {
-    final file = _prefsFile();
-    if (!await file.exists()) {
-      return ThemeMode.system;
-    }
-    final raw = await file.readAsString();
-    if (raw.trim().isEmpty) {
-      return ThemeMode.system;
-    }
-    final data = jsonDecode(raw);
-    if (data is! Map<String, dynamic>) {
-      return ThemeMode.system;
-    }
-    final value = data[_themeModeKey];
+    final value = await SimplePrefs.getString(_themeModeKey);
     if (value is! String) {
       return ThemeMode.system;
     }
@@ -88,19 +69,7 @@ Future<void> _saveThemeMode(ThemeMode mode) async {
     _ => 'system',
   };
   try {
-    final file = _prefsFile();
-    Map<String, dynamic> data = {};
-    if (await file.exists()) {
-      final raw = await file.readAsString();
-      if (raw.trim().isNotEmpty) {
-        final parsed = jsonDecode(raw);
-        if (parsed is Map<String, dynamic>) {
-          data = parsed;
-        }
-      }
-    }
-    data[_themeModeKey] = value;
-    await file.writeAsString(jsonEncode(data));
+    await SimplePrefs.setString(_themeModeKey, value);
   } catch (_) {
     // ignore persistence errors
   }
