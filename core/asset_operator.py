@@ -182,6 +182,48 @@ class AssetOperator:
         self.session.commit()
         return {"status": "success", "shares": float(shares)}
 
+    def record_financial_dividend(
+        self, product_id, account_id, amount, date, fee=0, currency="CNY"
+    ):
+        amount_dec = Decimal(str(amount))
+        fee_dec = Decimal(str(fee or 0))
+        self.session.execute(text("""
+            INSERT INTO financial_transactions (
+                product_id, account_id, trade_date, trade_type,
+                shares, amount, nav, fee, currency
+            ) VALUES (:pid, :aid, :date, 'dividend', NULL, :amount, NULL, :fee, :currency)
+        """), {
+            "pid": product_id,
+            "aid": account_id,
+            "date": date,
+            "amount": amount_dec,
+            "fee": fee_dec,
+            "currency": currency or "CNY",
+        })
+        self.session.commit()
+        return {"status": "success", "amount": float(amount_dec)}
+
+    def record_fund_dividend(
+        self, fund_id, account_id, amount, date, fee=0, currency="CNY"
+    ):
+        amount_dec = Decimal(str(amount))
+        fee_dec = Decimal(str(fee or 0))
+        self.session.execute(text("""
+            INSERT INTO fund_transactions (
+                fund_id, account_id, trade_date, trade_type,
+                shares, amount, nav, fee, currency
+            ) VALUES (:fid, :aid, :date, 'dividend', NULL, :amount, NULL, :fee, :currency)
+        """), {
+            "fid": fund_id,
+            "aid": account_id,
+            "date": date,
+            "amount": amount_dec,
+            "fee": fee_dec,
+            "currency": currency or "CNY",
+        })
+        self.session.commit()
+        return {"status": "success", "amount": float(amount_dec)}
+
     # --- 银行存款买入 ---
     def _buy_bank_deposit(self, account_id, deposit_type, principal, rate, start_date, end_date, currency="CNY", **kwargs):
         try:

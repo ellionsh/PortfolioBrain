@@ -216,6 +216,16 @@ class _FundProductsPageState extends State<FundProductsPage> {
                       const SizedBox(width: 4),
                       TextButton(
                         onPressed: () async {
+                          final ok = await _recordDividend(current);
+                          if (ok) {
+                            await refreshDetail();
+                          }
+                        },
+                        child: const Text('分红'),
+                      ),
+                      const SizedBox(width: 4),
+                      TextButton(
+                        onPressed: () async {
                           final ok = await _showFundDialog(fund: current);
                           if (ok) {
                             await refreshDetail();
@@ -800,6 +810,120 @@ class _FundProductsPageState extends State<FundProductsPage> {
     }
 
     messenger.showSnackBar(const SnackBar(content: Text('赎回成功')));
+    await _refresh();
+    return true;
+  }
+
+  Future<bool> _recordDividend(Map<String, dynamic> fund) async {
+    final amountController = TextEditingController();
+    final feeController = TextEditingController();
+    final dateController = TextEditingController(text: _today());
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('记录基金分红'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: amountController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: '分红金额',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: feeController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: '手续费（可选）',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: dateController,
+                  decoration: const InputDecoration(
+                    labelText: '分红日期 (YYYY-MM-DD)',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('取消'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final amount = double.tryParse(amountController.text);
+                final feeText = feeController.text.trim();
+                final fee = feeText.isEmpty ? 0 : double.tryParse(feeText);
+                if (amount == null || amount <= 0) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('请填写有效的分红金额')),
+                  );
+                  return;
+                }
+                if (fee == null || fee < 0) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('请填写有效的手续费')),
+                  );
+                  return;
+                }
+                Navigator.of(context).pop(true);
+              },
+              child: const Text('记录'),
+            ),
+          ],
+        );
+      },
+    );
+
+    final amount = double.tryParse(amountController.text);
+    final feeText = feeController.text.trim();
+    final fee = feeText.isEmpty ? 0 : double.tryParse(feeText);
+    final date = dateController.text.trim();
+    amountController.dispose();
+    feeController.dispose();
+    dateController.dispose();
+
+    if (confirmed != true || amount == null || fee == null) {
+      return false;
+    }
+
+    final accountId = fund['account_id'];
+    if (accountId == null) {
+      if (!mounted) return false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('该基金缺少所属账户')),
+      );
+      return false;
+    }
+
+    final response = await ApiClient.operate('fund_dividend', {
+      'fund_id': fund['id'],
+      'account_id': accountId,
+      'amount': amount,
+      'fee': fee,
+      'date': date,
+      'currency': fund['currency'] ?? 'CNY',
+    });
+    if (!mounted) return false;
+    final messenger = ScaffoldMessenger.of(context);
+    if (response.containsKey('error')) {
+      showErrorSnackBar(context, response['error']);
+      return false;
+    }
+
+    messenger.showSnackBar(const SnackBar(content: Text('分红已记录')));
     await _refresh();
     return true;
   }

@@ -70,6 +70,9 @@ class OperationSkill:
         elif action == "financial_update_nav":
             return self.op.update_nav(**params)
 
+        elif action == "financial_dividend":
+            return self.op.record_financial_dividend(**params)
+
         # ============================
         # 4. 保险（Insurance）
         # ============================
@@ -105,6 +108,9 @@ class OperationSkill:
 
         elif action == "fund_sell":
             return self.op.sell("fund", **params)
+
+        elif action == "fund_dividend":
+            return self.op.record_fund_dividend(**params)
 
         elif action == "fund_product_create":
             fund_code = params.get("fund_code")
