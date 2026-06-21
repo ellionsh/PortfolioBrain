@@ -149,7 +149,21 @@ class _FundProductsPageState extends State<FundProductsPage> {
             return AlertDialog(
               insetPadding:
                   const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
-              title: Text(current['fund_name'] ?? '基金详情'),
+              title: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      current['fund_name'] ?? '基金详情',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close),
+                    tooltip: '关闭',
+                  ),
+                ],
+              ),
               content: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 520),
                 child: SizedBox(
@@ -189,11 +203,6 @@ class _FundProductsPageState extends State<FundProductsPage> {
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        child: const Text('关闭'),
-                      ),
-                      const SizedBox(width: 4),
                       TextButton(
                         onPressed: () async {
                           final ok = await _buyFund(current);
